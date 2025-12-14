@@ -198,41 +198,6 @@ enum
 
 static int GetMoveRestrictionsRaw(int Direction, int Tile, int Flags)
 {
-	Flags = Flags & (TILEFLAG_XFLIP | TILEFLAG_YFLIP | TILEFLAG_ROTATE);
-	switch(Tile)
-	{
-	case TILE_STOP:
-		switch(Flags)
-		{
-		case ROTATION_0: return CANTMOVE_DOWN;
-		case ROTATION_90: return CANTMOVE_LEFT;
-		case ROTATION_180: return CANTMOVE_UP;
-		case ROTATION_270: return CANTMOVE_RIGHT;
-
-		case static_cast<int>(TILEFLAG_YFLIP) ^ static_cast<int>(ROTATION_0): return CANTMOVE_UP;
-		case static_cast<int>(TILEFLAG_YFLIP) ^ static_cast<int>(ROTATION_90): return CANTMOVE_RIGHT;
-		case static_cast<int>(TILEFLAG_YFLIP) ^ static_cast<int>(ROTATION_180): return CANTMOVE_DOWN;
-		case static_cast<int>(TILEFLAG_YFLIP) ^ static_cast<int>(ROTATION_270): return CANTMOVE_LEFT;
-		}
-		break;
-	case TILE_STOPS:
-		switch(Flags)
-		{
-		case ROTATION_0:
-		case ROTATION_180:
-		case static_cast<int>(TILEFLAG_YFLIP) ^ static_cast<int>(ROTATION_0):
-		case static_cast<int>(TILEFLAG_YFLIP) ^ static_cast<int>(ROTATION_180):
-			return CANTMOVE_DOWN | CANTMOVE_UP;
-		case ROTATION_90:
-		case ROTATION_270:
-		case static_cast<int>(TILEFLAG_YFLIP) ^ static_cast<int>(ROTATION_90):
-		case static_cast<int>(TILEFLAG_YFLIP) ^ static_cast<int>(ROTATION_270):
-			return CANTMOVE_LEFT | CANTMOVE_RIGHT;
-		}
-		break;
-	case TILE_STOPA:
-		return CANTMOVE_LEFT | CANTMOVE_RIGHT | CANTMOVE_UP | CANTMOVE_DOWN;
-	}
 	return 0;
 }
 
