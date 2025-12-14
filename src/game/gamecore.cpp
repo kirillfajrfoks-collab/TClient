@@ -337,8 +337,8 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 		if(!m_HookHitDisabled && m_pWorld && m_Tuning.m_PlayerHooking && (m_HookState == HOOK_FLYING || !m_NewHook))
 {
 	float Distance = 0.0f;
-	const float AIM_ASSIST_ANGLE = 40.0f * (pi / 180.0f); // 40 градусов в радианах
-	const float AIM_ASSIST_RANGE = PhysicalSize() * 3.0f; // Увеличиваем радиус захвата
+	const float AIM_ASSIST_ANGLE = 40.0f * (pi / 180.0f);
+	const float AIM_ASSIST_RANGE = PhysicalSize() * 3.0f;
 	
 	for(int i = 0; i < MAX_CLIENTS; i++)
 	{
@@ -360,40 +360,38 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 					Distance = distance(m_HookPos, pCharCore->m_Pos);
 				}
 			}
-			// Аим-ассист: проверка на близость к линии хука
+			// Аим-ассист
 			else
 			{
-				// Вектор от начала хука к игроку
 				vec2 toPlayer = pCharCore->m_Pos - m_HookPos;
 				float playerDist = length(toPlayer);
-				
-				// Нормализованный вектор направления хука
 				vec2 hookDir = normalize(m_HookDir);
-				
-				// Угол между направлением хука и направлением к игроку
 				float angle = acos(dot(normalize(toPlayer), hookDir));
 				
-				// Проверяем, попадает ли игрок в зону аим-ассиста
 				if(angle < AIM_ASSIST_ANGLE && playerDist < m_Tuning.m_HookLength)
 				{
-					// Ближайшая точка на линии хука к игроку
 					vec2 projPoint = m_HookPos + hookDir * dot(toPlayer, hookDir);
-					
-					// Расстояние от игрока до линии хука
 					float distToLine = distance(pCharCore->m_Pos, projPoint);
 					
-					// Если игрок достаточно близко к линии хука и впереди
 					if(distToLine < AIM_ASSIST_RANGE && dot(toPlayer, hookDir) > 0)
 					{
-						if(m_HookedPlayer == -1 || distance(m_HookPos, pCharCore->m_Pos) < Distance)
+						// ВАЖНОЕ ИЗМЕНЕНИЕ: проверяем путь от начала хука к ИГРОКУ (не к проецируемой точке)
+						vec2 TestPos = m_HookPos;
+						int Hit = m_pCollision->IntersectLineTeleHook(m_HookPos, pCharCore->m_Pos, &TestPos, nullptr, nullptr);
+						
+						// Если путь свободен или почти свободен
+						if(!Hit || (Hit == TILE_NOHOOK && distance(m_HookPos, TestPos) > playerDist * 0.9f))
 						{
-							m_TriggeredEvents |= COREEVENT_HOOK_ATTACH_PLAYER;
-							m_HookState = HOOK_GRABBED;
-							SetHookedPlayer(i);
-							Distance = distance(m_HookPos, pCharCore->m_Pos);
-							
-							// Немного корректируем позицию хука для реалистичности
-							m_HookPos = projPoint;
+							if(m_HookedPlayer == -1 || distance(m_HookPos, pCharCore->m_Pos) < Distance)
+							{
+								m_TriggeredEvents |= COREEVENT_HOOK_ATTACH_PLAYER;
+								m_HookState = HOOK_GRABBED;
+								SetHookedPlayer(i);
+								Distance = distance(m_HookPos, pCharCore->m_Pos);
+								
+								// Устанавливаем хук в позицию игрока (это гарантирует, что хук будет за стеной)
+								m_HookPos = pCharCore->m_Pos;
+							}
 						}
 					}
 				}
