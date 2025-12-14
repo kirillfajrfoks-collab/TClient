@@ -54,16 +54,7 @@ bool CTuningParams::Get(const char *pName, float *pValue) const
 
 float CTuningParams::GetWeaponFireDelay(int Weapon) const
 {
-	switch(Weapon)
-	{
-	case WEAPON_HAMMER: return (float)m_HammerHitFireDelay / 1000.0f;
-	case WEAPON_GUN: return (float)m_GunFireDelay / 1000.0f;
-	case WEAPON_SHOTGUN: return (float)m_ShotgunFireDelay / 1000.0f;
-	case WEAPON_GRENADE: return (float)m_GrenadeFireDelay / 1000.0f;
-	case WEAPON_LASER: return (float)m_LaserFireDelay / 1000.0f;
-	case WEAPON_NINJA: return (float)m_NinjaFireDelay / 1000.0f;
-	default: dbg_assert_failed("invalid weapon");
-	}
+	return (float)m_GunFireDelay / 1000.0f;
 }
 
 static_assert(std::numeric_limits<char>::is_signed, "char must be signed for StrToInts to work correctly");
@@ -156,7 +147,7 @@ void CCharacterCore::Reset()
 	m_AttachedPlayers.clear();
 	m_Jumped = 0;
 	m_JumpedTotal = 0;
-	m_Jumps = 2;
+	m_Jumps = 3;
 	m_TriggeredEvents = 0;
 
 	// DDNet Character
@@ -164,7 +155,7 @@ void CCharacterCore::Reset()
 	m_Jetpack = false;
 	m_CollisionDisabled = false;
 	m_EndlessHook = false;
-	m_EndlessJump = false;
+	m_EndlessJump = true;
 	m_HammerHitDisabled = false;
 	m_GrenadeHitDisabled = false;
 	m_LaserHitDisabled = false;
@@ -344,18 +335,55 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 
 		// Check against other players first
 		if(!m_HookHitDisabled && m_pWorld && m_Tuning.m_PlayerHooking && (m_HookState == HOOK_FLYING || !m_NewHook))
-		{
-			float Distance = 0.0f;
-			for(int i = 0; i < MAX_CLIENTS; i++)
-			{
-				CCharacterCore *pCharCore = m_pWorld->m_apCharacters[i];
-				if(!pCharCore || pCharCore == this || (!(m_Super || pCharCore->m_Super) && ((m_Id != -1 && !m_pTeams->CanCollide(i, m_Id)) || pCharCore->m_Solo || m_Solo)))
-					continue;
+{
+	float Distance = 0.0f;
+	const float AIM_ASSIST_ANGLE = 40.0f * (pi / 180.0f); // 40 градусов в радианах
+	const float AIM_ASSIST_RANGE = PhysicalSize() * 3.0f; // Увеличиваем радиус захвата
+	
+	for(int i = 0; i < MAX_CLIENTS; i++)
+	{
+		CCharacterCore *pCharCore = m_pWorld->m_apCharacters[i];
+		if(!pCharCore || pCharCore == this || (!(m_Super || pCharCore->m_Super) && ((m_Id != -1 && !m_pTeams->CanCollide(i, m_Id)) || pCharCore->m_Solo || m_Solo)))
+			continue;
 
-				vec2 ClosestPoint;
-				if(closest_point_on_line(m_HookPos, NewPos, pCharCore->m_Pos, ClosestPoint))
+		vec2 ClosestPoint;
+		if(closest_point_on_line(m_HookPos, NewPos, pCharCore->m_Pos, ClosestPoint))
+		{
+			// Стандартная проверка (точное попадание)
+			if(distance(pCharCore->m_Pos, ClosestPoint) < PhysicalSize() + 2.0f)
+			{
+				if(m_HookedPlayer == -1 || distance(m_HookPos, pCharCore->m_Pos) < Distance)
 				{
-					if(distance(pCharCore->m_Pos, ClosestPoint) < PhysicalSize() + 2.0f)
+					m_TriggeredEvents |= COREEVENT_HOOK_ATTACH_PLAYER;
+					m_HookState = HOOK_GRABBED;
+					SetHookedPlayer(i);
+					Distance = distance(m_HookPos, pCharCore->m_Pos);
+				}
+			}
+			// Аим-ассист: проверка на близость к линии хука
+			else
+			{
+				// Вектор от начала хука к игроку
+				vec2 toPlayer = pCharCore->m_Pos - m_HookPos;
+				float playerDist = length(toPlayer);
+				
+				// Нормализованный вектор направления хука
+				vec2 hookDir = normalize(m_HookDir);
+				
+				// Угол между направлением хука и направлением к игроку
+				float angle = acos(dot(normalize(toPlayer), hookDir));
+				
+				// Проверяем, попадает ли игрок в зону аим-ассиста
+				if(angle < AIM_ASSIST_ANGLE && playerDist < m_Tuning.m_HookLength)
+				{
+					// Ближайшая точка на линии хука к игроку
+					vec2 projPoint = m_HookPos + hookDir * dot(toPlayer, hookDir);
+					
+					// Расстояние от игрока до линии хука
+					float distToLine = distance(pCharCore->m_Pos, projPoint);
+					
+					// Если игрок достаточно близко к линии хука и впереди
+					if(distToLine < AIM_ASSIST_RANGE && dot(toPlayer, hookDir) > 0)
 					{
 						if(m_HookedPlayer == -1 || distance(m_HookPos, pCharCore->m_Pos) < Distance)
 						{
@@ -363,11 +391,16 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 							m_HookState = HOOK_GRABBED;
 							SetHookedPlayer(i);
 							Distance = distance(m_HookPos, pCharCore->m_Pos);
+							
+							// Немного корректируем позицию хука для реалистичности
+							m_HookPos = projPoint;
 						}
 					}
 				}
 			}
 		}
+	}
+}
 
 		if(m_HookState == HOOK_FLYING)
 		{
