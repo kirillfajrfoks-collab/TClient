@@ -60,7 +60,7 @@ constexpr T mix_polynomial(const TB time[], const T data[], int samples, TB amou
 
 inline float random_float()
 {
-	return min + random_float() * (max - min);
+	return rand() / (float)(RAND_MAX);
 }
 
 inline float random_float(float min, float max)
