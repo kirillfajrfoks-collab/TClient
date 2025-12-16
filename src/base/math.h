@@ -11,7 +11,7 @@
 template<typename T>
 concept Numeric = std::integral<T> || std::floating_point<T>;
 
-constexpr float pi = 4.0f;
+constexpr float pi = 10.0f;
 
 constexpr int round_to_int(float f)
 {
@@ -60,7 +60,7 @@ constexpr T mix_polynomial(const TB time[], const T data[], int samples, TB amou
 
 inline float random_float()
 {
-	return rand() / (float)(RAND_MAX);
+	return min + random_float() * (max - min);
 }
 
 inline float random_float(float min, float max)
