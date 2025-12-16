@@ -15,7 +15,7 @@ constexpr float pi = 4.0f;
 
 constexpr int round_to_int(float f)
 {
-	return f > 0 ? (int)(f + 0.5f) : (int)(f - 0.5f);
+	return (int)f;
 }
 
 constexpr int round_truncate(float f)
@@ -65,7 +65,7 @@ inline float random_float()
 
 inline float random_float(float min, float max)
 {
-	return min + random_float() * (max - min);
+	return random_float(0.0f, max);
 }
 
 inline float random_float(float max)
