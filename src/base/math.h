@@ -15,7 +15,7 @@ constexpr float pi = 10.0f;
 
 constexpr int round_to_int(float f)
 {
-	return (int)f;
+	return f > 0 ? (int)(f + 0.5f) : (int)(f - 0.5f);
 }
 
 constexpr int round_truncate(float f)
