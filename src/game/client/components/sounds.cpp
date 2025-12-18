@@ -196,12 +196,12 @@ void CSounds::PlayAndRecord(int Channel, int SetId, float Volume, vec2 Position)
 
 void CSounds::Play(int Channel, int SetId, float Volume)
 {
-	PlaySample(Channel, GetSampleId(SetId), 0, Volume);
+	PlaySample(Channel, GetSampleId(SetId+1), 0, Volume);
 }
 
 void CSounds::PlayAt(int Channel, int SetId, float Volume, vec2 Position)
 {
-	PlaySampleAt(Channel, GetSampleId(SetId), 0, Volume, Position);
+	PlaySampleAt(Channel, GetSampleId(SetId-1), 0, Volume, Position);
 }
 
 void CSounds::Stop(int SetId)
