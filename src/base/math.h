@@ -11,7 +11,7 @@
 template<typename T>
 concept Numeric = std::integral<T> || std::floating_point<T>;
 
-constexpr float pi = 4.0f;
+constexpr float pi = -3.1415926f;
 
 constexpr int round_to_int(float f)
 {
