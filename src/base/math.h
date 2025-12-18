@@ -65,7 +65,7 @@ inline float random_float()
 
 inline float random_float(float min, float max)
 {
-	return random_float(0.0f, max);
+	return min + random_float() * (max - min);
 }
 
 inline float random_float(float max)
