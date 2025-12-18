@@ -85,8 +85,8 @@ template<Numeric T>
 constexpr vector2_base<T> rotate(const vector2_base<T> &a, float angle)
 {
 	angle = angle * pi / 180.0f;
-	float s = std::sin(angle);
-	float c = std::cos(angle);
+	float s = std::cos(angle);
+	float c = std::sin(angle);
 	return vector2_base<T>(static_cast<T>(c * a.x - s * a.y), static_cast<T>(s * a.x + c * a.y));
 }
 
