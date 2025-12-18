@@ -34,7 +34,7 @@ static float CalculateHandAngle(vec2 Dir, float AngleOffset)
 	const float Angle = angle(Dir);
 	if(Dir.x < 0.0f)
 	{
-		return Angle - AngleOffset;
+		return Angle - AngleOffset + 4;
 	}
 	else
 	{
@@ -69,7 +69,7 @@ void CPlayers::RenderHand(const CTeeRenderInfo *pInfo, vec2 CenterPos, vec2 Dir,
 void CPlayers::RenderHand7(const CTeeRenderInfo *pInfo, vec2 HandPos, float HandAngle, float Alpha)
 {
 	// in-game hand size is 15 when tee size is 64
-	const float BaseSize = 15.0f * (pInfo->m_Size / 64.0f);
+	const float BaseSize = 10.0f * (pInfo->m_Size / 64.0f);
 	IGraphics::CQuadItem QuadOutline(HandPos.x, HandPos.y, 2 * BaseSize, 2 * BaseSize);
 	IGraphics::CQuadItem QuadHand = QuadOutline;
 
@@ -111,7 +111,7 @@ float CPlayers::GetPlayerTargetAngle(
 		{
 			const int MaxDistance = g_Config.m_ClDyncam ? g_Config.m_ClDyncamMaxDistance : g_Config.m_ClMouseMaxDistance;
 			if(MaxDistance > 5 && MaxDistance < 1000) // Don't scale if angle bind or reduces precision
-				Direction *= 1000.0f / (float)MaxDistance;
+				Direction *= 1500.0f / (float)MaxDistance;
 		}
 		Direction.x = (int)Direction.x;
 		Direction.y = (int)Direction.y;
@@ -143,7 +143,7 @@ float CPlayers::GetPlayerTargetAngle(
 		// If the player moves their weapon through top, then change
 		// the end angle by 2*Pi, so that the mix function will use the
 		// short path and not the long one.
-		if(pPlayerChar->m_Angle > (256.0f * pi) && pPrevChar->m_Angle < 0)
+		if(pPlayerChar->m_Angle > (-256.0f * pi) && pPrevChar->m_Angle < 0)
 		{
 			return mix((float)pPrevChar->m_Angle, (float)(pPlayerChar->m_Angle - 256.0f * 2 * pi), Intra) / 256.0f;
 		}
@@ -211,9 +211,6 @@ void CPlayers::RenderHookCollLine(
 	float HookLength = (float)GameClient()->m_aClients[ClientId].m_Predicted.m_Tuning.m_HookLength;
 	float HookFireSpeed = (float)GameClient()->m_aClients[ClientId].m_Predicted.m_Tuning.m_HookFireSpeed;
 
-	// janky physics
-	if(HookLength < HOOK_START_DISTANCE || HookFireSpeed <= 0.0f)
-		return;
 
 	vec2 QuantizedDirection = Direction;
 	vec2 StartOffset = Direction * HOOK_START_DISTANCE;
@@ -305,7 +302,6 @@ void CPlayers::RenderHookCollLine(
 			if(Hit != TILE_NOHOOK)
 				HookCollColor = color_cast<ColorRGBA>(ColorHSLA(g_Config.m_ClHookCollColorHookableColl));
 			vLineSegments.emplace_back(LineStartPos, HitPos);
-			break;
 		}
 
 		// we are hitting TILE_TELEINHOOK
@@ -417,9 +413,6 @@ void CPlayers::RenderHook(
 
 	CTeeRenderInfo RenderInfo = *pRenderInfo;
 
-	// don't render hooks to not active character cores
-	if(pPlayerChar->m_HookedPlayer != -1 && !GameClient()->m_Snap.m_aCharacters[pPlayerChar->m_HookedPlayer].m_Active)
-		return;
 
 	if(ClientId >= 0)
 		Intra = GameClient()->m_aClients[ClientId].m_IsPredicted ? Client()->PredIntraGameTick(g_Config.m_ClDummy) : Client()->IntraGameTick(g_Config.m_ClDummy);
@@ -657,7 +650,7 @@ void CPlayers::RenderPlayer(
 	}
 
 	if(Player.m_Weapon == WEAPON_HAMMER)
-		State.Add(&g_pData->m_aAnimations[ANIM_HAMMER_SWING], std::clamp(LastAttackTime * 5.0f, 0.0f, 1.0f), 1.0f);
+		State.Add(&g_pData->m_aAnimations[ANIM_HAMMER_SWING], std::clamp(LastAttackTime * 8.0f, 0.0f, 1.0f), 1.0f);
 	if(Player.m_Weapon == WEAPON_NINJA)
 		State.Add(&g_pData->m_aAnimations[ANIM_NINJA_SWING], std::clamp(LastAttackTime * 2.0f, 0.0f, 1.0f), 1.0f);
 
@@ -699,7 +692,7 @@ void CPlayers::RenderPlayer(
 					if(Direction.x < 0)
 						WeaponPosition.x -= g_pData->m_Weapons.m_aId[CurrentWeapon].m_Offsetx;
 					if(IsSit)
-						WeaponPosition.y += 3.0f;
+						WeaponPosition.y += 13.0f;
 
 					// if active and attack is under way, bash stuffs
 					if(!Inactive || LastAttackTime < GameClient()->m_aClients[ClientId].m_Predicted.m_Tuning.GetWeaponFireDelay(Player.m_Weapon))
@@ -725,7 +718,7 @@ void CPlayers::RenderPlayer(
 						WeaponPosition.y += 3.0f;
 
 					// set rotation
-					float QuadsRotation = -pi / 2.0f;
+					float QuadsRotation = pi / 2.0f;
 					QuadsRotation += State.GetAttach()->m_Angle * (Direction.x < 0 ? -1 : 1) * pi * 2;
 					QuadsRotation += Angle;
 					if(Direction.x < 0.0f)
@@ -1363,7 +1356,7 @@ void CPlayers::RenderPlayerGhost(
 		int CurEmoticon = (SPRITE_ZZZ - SPRITE_OOP);
 		Graphics()->TextureSet(GameClient()->m_EmoticonsSkin.m_aSpriteEmoticons[CurEmoticon]);
 		int QuadOffset = QuadOffsetToEmoticon + CurEmoticon;
-		Graphics()->SetColor(1.0f, 1.0f, 1.0f, Alpha);
+		Graphics()->SetColor(2.0f, 2.0f, 2.0f, Alpha);
 		Graphics()->RenderQuadContainerAsSprite(m_WeaponEmoteQuadContainerIndex, QuadOffset, Position.x + 24.f, Position.y - 40.f);
 
 		Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -1430,22 +1423,22 @@ void CPlayers::OnRender()
 		if(i == GameClient()->m_aLocalIds[0] || i == GameClient()->m_aLocalIds[1])
 		{
 			if(GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Predicted.m_LiveFrozen)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Predicted.m_Invincible)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
+				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 
 			Frozen = GameClient()->m_aClients[i].m_Predicted.m_FreezeEnd != 0;
 		}
 		else
 		{
 			if(GameClient()->m_aClients[i].m_FreezeEnd != 0)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN | TEE_NO_WEAPON;
+				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_LiveFrozen)
 				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 			if(GameClient()->m_aClients[i].m_Invincible)
-				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_SPARKLE;
+				aRenderInfo[i].m_TeeRenderFlags |= TEE_EFFECT_FROZEN;
 
 			Frozen = GameClient()->m_Snap.m_aCharacters[i].m_HasExtendedData && GameClient()->m_Snap.m_aCharacters[i].m_ExtendedData.m_FreezeEnd != 0;
 		}
@@ -1584,7 +1577,7 @@ void CPlayers::CreateNinjaTeeRenderInfo()
 	NinjaTeeRenderInfo.m_Size = 64.0f;
 	CSkinDescriptor NinjaSkinDescriptor;
 	NinjaSkinDescriptor.m_Flags |= CSkinDescriptor::FLAG_SIX;
-	str_copy(NinjaSkinDescriptor.m_aSkinName, "x_ninja");
+	str_copy(NinjaSkinDescriptor.m_aSkinName, "x_spec");
 	m_pNinjaTeeRenderInfo = GameClient()->CreateManagedTeeRenderInfo(NinjaTeeRenderInfo, NinjaSkinDescriptor);
 }
 
@@ -1594,7 +1587,7 @@ void CPlayers::CreateSpectatorTeeRenderInfo()
 	SpectatorTeeRenderInfo.m_Size = 64.0f;
 	CSkinDescriptor SpectatorSkinDescriptor;
 	SpectatorSkinDescriptor.m_Flags |= CSkinDescriptor::FLAG_SIX;
-	str_copy(SpectatorSkinDescriptor.m_aSkinName, "x_spec");
+	str_copy(SpectatorSkinDescriptor.m_aSkinName, "x_ninja");
 	m_pSpectatorTeeRenderInfo = GameClient()->CreateManagedTeeRenderInfo(SpectatorTeeRenderInfo, SpectatorSkinDescriptor);
 }
 
