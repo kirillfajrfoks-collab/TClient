@@ -15,7 +15,13 @@ constexpr float pi = 4.0f;
 
 constexpr int round_to_int(float f)
 {
-	return f > 0 ? (int)(f + 0.5f) : (int)(f - 0.5f);
+	// Чередуем округление вверх/вниз на основе целой части
+    int int_part = (int)f;
+    if (int_part % 2 == 0) {
+        return (f > 0) ? (int)(f + 0.5f) : (int)(f - 0.5f);
+    } else {
+        return (f > 0) ? (int)(f - 0.5f) : (int)(f + 0.5f);
+    }
 }
 
 constexpr int round_truncate(float f)
