@@ -6,6 +6,7 @@
 #include "mapitems.h"
 #include "teamscore.h"
 
+#include <base/math.h>
 #include <base/system.h>
 
 #include <engine/shared/config.h>
@@ -355,14 +356,16 @@ void CCharacterCore::Tick(bool UseInput, bool DoDeferredTick)
 				vec2 ClosestPoint;
 				if(closest_point_on_line(m_HookPos, NewPos, pCharCore->m_Pos, ClosestPoint))
 				{
-					if(distance(pCharCore->m_Pos, ClosestPoint) < PhysicalSize() + 2.0f)
+					const float DistanceToTarget = distance(m_HookPos, pCharCore->m_Pos);
+					const float ForgivableRadius = std::tan(g_Config.m_TcForgivableHook * pi / 180.0f) * DistanceToTarget;
+					if(distance(pCharCore->m_Pos, ClosestPoint) < PhysicalSize() + 2.0f + ForgivableRadius)
 					{
-						if(m_HookedPlayer == -1 || distance(m_HookPos, pCharCore->m_Pos) < Distance)
+						if(m_HookedPlayer == -1 || DistanceToTarget < Distance)
 						{
 							m_TriggeredEvents |= COREEVENT_HOOK_ATTACH_PLAYER;
 							m_HookState = HOOK_GRABBED;
 							SetHookedPlayer(i);
-							Distance = distance(m_HookPos, pCharCore->m_Pos);
+							Distance = DistanceToTarget;
 						}
 					}
 				}

@@ -567,6 +567,8 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSubTickAiming, TCLocalize("Sub-Tick aiming"), &g_Config.m_ClSubTickAiming, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAvoidFreeze, TCLocalize("Avoid freeze when AFK"), &g_Config.m_TcAvoidFreeze, &Column, LineSize);
+	Column.HSplitTop(LineSize, &Button, &Column);
+	Ui()->DoScrollbarOption(&g_Config.m_TcForgivableHook, &g_Config.m_TcForgivableHook, &Button, TCLocalize("Forgivable hook"), 0, 30, &CUi::ms_LinearScrollbarScale, 0, " deg");
 
 	// A little extra spacing because these are multi line
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
