@@ -193,48 +193,79 @@ bool CControls::IsFreezeTile(vec2 Pos)
 	       FrontTile == TILE_FREEZE || FrontTile == TILE_DFREEZE || FrontTile == TILE_LFREEZE;
 }
 
+bool CControls::IsSingleFreezeTile(vec2 Pos)
+{
+	if(!IsFreezeTile(Pos))
+		return false;
+
+	static constexpr vec2 s_aOffsets[] = {vec2(-32.0f, 0.0f), vec2(32.0f, 0.0f), vec2(0.0f, -32.0f), vec2(0.0f, 32.0f)};
+	for(const vec2 &Offset : s_aOffsets)
+	{
+		if(IsFreezeTile(Pos + Offset))
+			return false;
+	}
+	return true;
+}
+
 void CControls::AvoidFreeze()
 {
 	if(!g_Config.m_TcAvoidFreeze || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
 		return;
 
 	const CCharacterCore &Char = GameClient()->m_PredictedChar;
-	if(Char.m_IsInFreeze || m_aInputDirectionLeft[g_Config.m_ClDummy] || m_aInputDirectionRight[g_Config.m_ClDummy])
+	if(Char.m_IsInFreeze)
 		return;
 
 	const vec2 Pos = Char.m_Pos;
 	const vec2 Vel = Char.m_Vel;
+	const bool HookedByPlayer = !Char.m_AttachedPlayers.empty();
+	const bool ManualDirection = m_aInputDirectionLeft[g_Config.m_ClDummy] || m_aInputDirectionRight[g_Config.m_ClDummy];
+	const int LookAheadTicks = HookedByPlayer ? 12 : 6;
 	int AvoidDir = 0;
+	bool FreezeAbove = false;
+	bool FreezeBelow = false;
 
-	for(int Tick = 1; Tick <= 10 && AvoidDir == 0; ++Tick)
+	for(int Tick = 1; Tick <= LookAheadTicks; ++Tick)
 	{
-		const vec2 CheckPos = Pos + Vel * (Tick / 50.0f);
+		const vec2 CheckPos = Pos + Vel * Tick;
 		static constexpr float s_aOffsetY[] = {-12.0f, 0.0f, 12.0f};
 		for(float OffsetY : s_aOffsetY)
 		{
-			if(IsFreezeTile(CheckPos + vec2(-14.0f, OffsetY)))
+			if(!ManualDirection && AvoidDir == 0 && IsFreezeTile(CheckPos + vec2(-14.0f, OffsetY)))
 			{
 				AvoidDir = 1;
-				break;
 			}
-			if(IsFreezeTile(CheckPos + vec2(14.0f, OffsetY)))
+			if(!ManualDirection && AvoidDir == 0 && IsFreezeTile(CheckPos + vec2(14.0f, OffsetY)))
 			{
 				AvoidDir = -1;
-				break;
 			}
 		}
+
+		FreezeAbove = FreezeAbove || IsFreezeTile(CheckPos + vec2(-12.0f, -22.0f)) || IsFreezeTile(CheckPos + vec2(12.0f, -22.0f));
+		FreezeBelow = FreezeBelow || IsFreezeTile(CheckPos + vec2(-12.0f, 22.0f)) || IsFreezeTile(CheckPos + vec2(12.0f, 22.0f));
 	}
 
-	if(AvoidDir == 0)
+	if(AvoidDir == 0 && (!HookedByPlayer || (!FreezeAbove && !FreezeBelow)))
 		return;
 
-	m_aInputData[g_Config.m_ClDummy].m_Direction = AvoidDir;
+	if(AvoidDir != 0)
+		m_aInputData[g_Config.m_ClDummy].m_Direction = AvoidDir;
+	if(HookedByPlayer && FreezeBelow)
+		m_aInputData[g_Config.m_ClDummy].m_Jump = 1;
+	if(HookedByPlayer && FreezeAbove)
+	{
+		m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
+		m_aInputData[g_Config.m_ClDummy].m_TargetX = 0;
+		m_aInputData[g_Config.m_ClDummy].m_TargetY = 100;
+	}
 	m_AvoidFreezeMessageTick = Client()->GameTick(g_Config.m_ClDummy) + 10;
 }
 
 void CControls::ForgiveHook()
 {
 	if(g_Config.m_TcForgivableHook <= 0 || !m_aInputData[g_Config.m_ClDummy].m_Hook || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+	if(m_aLastData[g_Config.m_ClDummy].m_Hook || !GameClient()->m_PredictedChar.m_AttachedPlayers.empty())
 		return;
 
 	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
@@ -258,8 +289,20 @@ void CControls::ForgiveHook()
 			continue;
 
 		const vec2 ClosestPoint = Pos + Target * DistanceAlongHook;
+		const float VanillaRadius = CCharacterCore::PhysicalSize() + 2.0f;
+		if(distance(OtherPos, ClosestPoint) <= VanillaRadius)
+			continue;
+
 		const float ForgivableRadius = std::tan(g_Config.m_TcForgivableHook * pi / 180.0f) * DistanceToTarget;
-		if(distance(OtherPos, ClosestPoint) < CCharacterCore::PhysicalSize() + 2.0f + ForgivableRadius && (ClosestClientId == -1 || DistanceToTarget < ClosestDistance))
+		vec2 CollisionPos;
+		int TeleNr = 0;
+		const vec2 Aim = OtherPos - Pos;
+		const vec2 AimDir = normalize(Aim);
+		const vec2 HookStart = Pos + AimDir * CCharacterCore::PhysicalSize() * 1.5f;
+		if(Collision()->IntersectLineTeleHook(HookStart, OtherPos, &CollisionPos, nullptr, &TeleNr))
+			continue;
+
+		if(distance(OtherPos, ClosestPoint) < VanillaRadius + ForgivableRadius && (ClosestClientId == -1 || DistanceToTarget < ClosestDistance))
 		{
 			ClosestClientId = ClientId;
 			ClosestDistance = DistanceToTarget;
@@ -273,6 +316,60 @@ void CControls::ForgiveHook()
 	const vec2 Aim = OtherPos - Pos;
 	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
 	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
+}
+
+void CControls::AutoLed()
+{
+	if(!g_Config.m_TcAutoLed || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+
+	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
+	int TargetClientId = -1;
+	float ClosestDistance = 0.0f;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || GameClient()->IsOtherTeam(ClientId))
+			continue;
+
+		const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
+		const vec2 OtherPos = vec2(Char.m_X, Char.m_Y);
+		const vec2 OtherVel = vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f);
+		const float Dist = distance(Pos, OtherPos);
+		if(Dist > CCharacterCore::PhysicalSize() * 2.5f)
+			continue;
+
+		bool EntersSingleFreeze = false;
+		for(int Tick = 1; Tick <= 4; ++Tick)
+		{
+			if(IsSingleFreezeTile(OtherPos + OtherVel * Tick))
+			{
+				EntersSingleFreeze = true;
+				break;
+			}
+		}
+		if(!EntersSingleFreeze)
+			continue;
+
+		if(TargetClientId == -1 || Dist < ClosestDistance)
+		{
+			TargetClientId = ClientId;
+			ClosestDistance = Dist;
+		}
+	}
+
+	if(TargetClientId == -1)
+		return;
+
+	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_Y);
+	const vec2 Aim = OtherPos - Pos;
+	m_aInputData[g_Config.m_ClDummy].m_WantedWeapon = WEAPON_HAMMER + 1;
+	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
+	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
+	if(GameClient()->m_PredictedChar.m_ActiveWeapon != WEAPON_HAMMER && GameClient()->m_Snap.m_pLocalCharacter->m_Weapon != WEAPON_HAMMER)
+		return;
+	if((m_aInputData[g_Config.m_ClDummy].m_Fire & 1) == 0)
+		m_aInputData[g_Config.m_ClDummy].m_Fire++;
+	m_aInputData[g_Config.m_ClDummy].m_Fire &= INPUT_STATE_MASK;
 }
 
 int CControls::SnapInput(int *pData)
@@ -374,6 +471,7 @@ int CControls::SnapInput(int *pData)
 			m_aInputData[g_Config.m_ClDummy].m_TargetX = 1;
 
 		ForgiveHook();
+		AutoLed();
 
 		// set direction
 		m_aInputData[g_Config.m_ClDummy].m_Direction = 0;

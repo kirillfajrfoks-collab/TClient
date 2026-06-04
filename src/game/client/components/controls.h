@@ -63,9 +63,11 @@ public:
 	bool CheckNewInput();
 	void AvoidFreeze();
 	void ForgiveHook();
+	void AutoLed();
 
 private:
 	bool IsFreezeTile(vec2 Pos);
+	bool IsSingleFreezeTile(vec2 Pos);
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);

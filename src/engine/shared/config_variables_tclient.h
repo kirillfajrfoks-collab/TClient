@@ -62,6 +62,7 @@ MACRO_CONFIG_INT(TcFastInputAmount, tc_fast_input_amount, 20, 1, 100, CFGFLAG_CL
 MACRO_CONFIG_INT(TcFastInputOthers, tc_fast_input_others, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Apply fast input to other tees")
 MACRO_CONFIG_INT(TcAvoidFreeze, tc_avoid_freeze, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically move away from nearby freeze tiles")
 MACRO_CONFIG_INT(TcForgivableHook, tc_forgivable_hook, 0, 0, 30, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Extra hook hit forgiveness in degrees")
+MACRO_CONFIG_INT(TcAutoLed, tc_autoled, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically hammer teammates entering single freeze tiles")
 
 MACRO_CONFIG_INT(TcAntiPingImproved, tc_antiping_improved, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Different antiping smoothing algorithm, not compatible with cl_antiping_smooth")
 MACRO_CONFIG_INT(TcAntiPingNegativeBuffer, tc_antiping_negative_buffer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Helps in Gores. Allows internal certainty value to be negative which causes more conservative prediction")
