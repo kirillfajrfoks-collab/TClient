@@ -191,10 +191,8 @@ void CCharacter::HandleNinja()
 
 void CCharacter::DoWeaponSwitch()
 {
-	m_ReloadTimer = 0;
-
 	// make sure we can switch
-	if(m_QueuedWeapon == -1)
+	if(m_ReloadTimer != 0 || m_QueuedWeapon == -1)
 		return;
 	if(m_Core.m_aWeapons[WEAPON_NINJA].m_Got || !m_Core.m_aWeapons[m_QueuedWeapon].m_Got)
 		return;
@@ -261,7 +259,8 @@ void CCharacter::FireWeapon()
 	if(!GameWorld()->m_WorldConfig.m_PredictWeapons)
 		return;
 
-	m_ReloadTimer = 0;
+	if(m_ReloadTimer != 0)
+		return;
 
 	DoWeaponSwitch();
 	vec2 Direction = normalize(vec2(m_LatestInput.m_TargetX, m_LatestInput.m_TargetY));
@@ -375,7 +374,8 @@ void CCharacter::FireWeapon()
 		// if we Hit anything, we have to wait for the reload
 		if(Hits)
 		{
-			m_ReloadTimer = 0;
+			float FireDelay = GetTuning(GetOverriddenTuneZone())->m_HammerHitFireDelay;
+			m_ReloadTimer = FireDelay * GameWorld()->GameTickSpeed() / 1000;
 		}
 	}
 	break;
@@ -487,6 +487,10 @@ void CCharacter::FireWeapon()
 
 	m_AttackTick = GameWorld()->GameTick(); // NOLINT(clang-analyzer-unix.Malloc)
 
+	if(!m_ReloadTimer)
+	{
+		m_ReloadTimer = GetTuning(GetOverriddenTuneZone())->GetWeaponFireDelay(m_Core.m_ActiveWeapon) * GameWorld()->GameTickSpeed();
+	}
 }
 
 void CCharacter::HandleWeapons()
@@ -501,7 +505,8 @@ void CCharacter::HandleWeapons()
 	// check reload timer
 	if(m_ReloadTimer)
 	{
-		m_ReloadTimer = 0;
+		m_ReloadTimer--;
+		return;
 	}
 
 	// fire Weapon, if wanted
@@ -1510,7 +1515,8 @@ void CCharacter::Read(CNetObj_Character *pChar, CNetObj_DDNetCharacter *pExtende
 	{
 		if(maximum(m_LastTuneZoneTick, m_LastWeaponSwitchTick) + GameWorld()->GameTickSpeed() < GameWorld()->GameTick())
 		{
-			m_ReloadTimer = 0;
+			const int FireDelayTicks = GetTuning(GetOverriddenTuneZone())->GetWeaponFireDelay(m_Core.m_ActiveWeapon) * GameWorld()->GameTickSpeed();
+			m_ReloadTimer = maximum(0, m_AttackTick + FireDelayTicks - GameWorld()->GameTick());
 		}
 	}
 }

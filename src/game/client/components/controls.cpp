@@ -220,32 +220,54 @@ void CControls::AvoidFreeze()
 	const vec2 Vel = Char.m_Vel;
 	const bool HookedByPlayer = !Char.m_AttachedPlayers.empty();
 	const bool ManualDirection = m_aInputDirectionLeft[g_Config.m_ClDummy] || m_aInputDirectionRight[g_Config.m_ClDummy];
-	const int LookAheadTicks = HookedByPlayer ? 12 : 6;
+	const int LookAheadTicks = HookedByPlayer ? 14 : 8;
+
+	const auto IsDangerous = [&](vec2 CheckPos) {
+		static const vec2 s_aHitboxPoints[] = {
+			vec2(-14.0f, -14.0f), vec2(14.0f, -14.0f), vec2(-14.0f, 14.0f), vec2(14.0f, 14.0f),
+			vec2(0.0f, -18.0f), vec2(0.0f, 18.0f), vec2(-18.0f, 0.0f), vec2(18.0f, 0.0f)};
+		for(const vec2 &Point : s_aHitboxPoints)
+		{
+			if(IsFreezeTile(CheckPos + Point))
+				return true;
+		}
+		return false;
+	};
+
+	const auto DangerScore = [&](int Direction) {
+		int Score = 0;
+		for(int Tick = 1; Tick <= LookAheadTicks; ++Tick)
+		{
+			const vec2 CheckPos = Pos + Vel * Tick + vec2(Direction * 6.0f * Tick, 0.0f);
+			if(IsDangerous(CheckPos))
+				Score += (LookAheadTicks - Tick + 1) * (HookedByPlayer ? 3 : 1);
+		}
+		return Score;
+	};
+
+	const int CurrentScore = DangerScore(0);
+	if(CurrentScore == 0 && !HookedByPlayer)
+		return;
+
 	int AvoidDir = 0;
+	if(!ManualDirection)
+	{
+		const int LeftScore = DangerScore(-1);
+		const int RightScore = DangerScore(1);
+		if(LeftScore < CurrentScore || RightScore < CurrentScore)
+			AvoidDir = LeftScore < RightScore ? -1 : 1;
+	}
+
 	bool FreezeAbove = false;
 	bool FreezeBelow = false;
-
 	for(int Tick = 1; Tick <= LookAheadTicks; ++Tick)
 	{
 		const vec2 CheckPos = Pos + Vel * Tick;
-		static constexpr float s_aOffsetY[] = {-12.0f, 0.0f, 12.0f};
-		for(float OffsetY : s_aOffsetY)
-		{
-			if(!ManualDirection && AvoidDir == 0 && IsFreezeTile(CheckPos + vec2(-14.0f, OffsetY)))
-			{
-				AvoidDir = 1;
-			}
-			if(!ManualDirection && AvoidDir == 0 && IsFreezeTile(CheckPos + vec2(14.0f, OffsetY)))
-			{
-				AvoidDir = -1;
-			}
-		}
-
 		FreezeAbove = FreezeAbove || IsFreezeTile(CheckPos + vec2(-12.0f, -22.0f)) || IsFreezeTile(CheckPos + vec2(12.0f, -22.0f));
 		FreezeBelow = FreezeBelow || IsFreezeTile(CheckPos + vec2(-12.0f, 22.0f)) || IsFreezeTile(CheckPos + vec2(12.0f, 22.0f));
 	}
 
-	if(AvoidDir == 0 && (!HookedByPlayer || (!FreezeAbove && !FreezeBelow)))
+	if(AvoidDir == 0 && (!HookedByPlayer || (!FreezeAbove && !FreezeBelow)) && CurrentScore == 0)
 		return;
 
 	if(AvoidDir != 0)
@@ -276,7 +298,7 @@ void CControls::ForgiveHook()
 		return;
 	Target = normalize(Target);
 
-	float ClosestDistance = 0.0f;
+	float BestLateralMiss = 0.0f;
 	int ClosestClientId = -1;
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
@@ -303,10 +325,11 @@ void CControls::ForgiveHook()
 			continue;
 		const vec2 ClosestPoint = Pos + Target * PredictedDistanceAlongHook;
 		const float VanillaRadius = CCharacterCore::PhysicalSize() + 2.0f;
-		if(distance(PredictedOtherPos, ClosestPoint) <= VanillaRadius)
+		const float LateralMiss = distance(PredictedOtherPos, ClosestPoint);
+		if(LateralMiss <= VanillaRadius)
 			continue;
 
-		const float ForgivableRadius = std::tan(g_Config.m_TcForgivableHook * pi / 180.0f) * DistanceToTarget;
+		const float ForgivableRadius = std::min(std::tan(g_Config.m_TcForgivableHook * pi / 180.0f) * DistanceToTarget, 64.0f);
 		vec2 CollisionPos;
 		int TeleNr = 0;
 		const vec2 Aim = PredictedOtherPos - Pos;
@@ -315,10 +338,10 @@ void CControls::ForgiveHook()
 		if(length(Aim) > HookLength || Collision()->IntersectLineTeleHook(HookStart, PredictedOtherPos, &CollisionPos, nullptr, &TeleNr))
 			continue;
 
-		if(distance(PredictedOtherPos, ClosestPoint) < VanillaRadius + ForgivableRadius && (ClosestClientId == -1 || DistanceToTarget < ClosestDistance))
+		if(LateralMiss < VanillaRadius + ForgivableRadius && (ClosestClientId == -1 || LateralMiss < BestLateralMiss))
 		{
 			ClosestClientId = ClientId;
-			ClosestDistance = DistanceToTarget;
+			BestLateralMiss = LateralMiss;
 		}
 	}
 
@@ -331,6 +354,11 @@ void CControls::ForgiveHook()
 	const float HookTicksToTarget = distance(Pos, OtherPos) / HookFireSpeed;
 	const vec2 PredictedOtherPos = OtherPos + OtherVel * std::clamp(HookTicksToTarget, 0.0f, 6.0f);
 	const vec2 Aim = PredictedOtherPos - Pos;
+	if(length(Aim) <= 0.0f || length(Aim) > HookLength)
+		return;
+	const float Dot = std::clamp(dot(normalize(Aim), Target), -1.0f, 1.0f);
+	if(std::acos(Dot) > g_Config.m_TcForgivableHook * pi / 180.0f)
+		return;
 	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
 	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
 }
