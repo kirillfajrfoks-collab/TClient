@@ -17,6 +17,7 @@
 #include <game/client/components/scoreboard.h>
 #include <game/client/gameclient.h>
 #include <game/collision.h>
+#include <game/gamecore.h>
 #include <game/mapitems.h>
 
 CControls::CControls()
@@ -231,6 +232,49 @@ void CControls::AvoidFreeze()
 	m_AvoidFreezeMessageTick = Client()->GameTick(g_Config.m_ClDummy) + 10;
 }
 
+void CControls::ForgiveHook()
+{
+	if(g_Config.m_TcForgivableHook <= 0 || !m_aInputData[g_Config.m_ClDummy].m_Hook || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+
+	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
+	vec2 Target = vec2(m_aInputData[g_Config.m_ClDummy].m_TargetX, m_aInputData[g_Config.m_ClDummy].m_TargetY);
+	if(Target == vec2(0.0f, 0.0f))
+		return;
+	Target = normalize(Target);
+
+	float ClosestDistance = 0.0f;
+	int ClosestClientId = -1;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || GameClient()->IsOtherTeam(ClientId))
+			continue;
+
+		const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y);
+		const vec2 ToOther = OtherPos - Pos;
+		const float DistanceToTarget = length(ToOther);
+		const float DistanceAlongHook = dot(ToOther, Target);
+		if(DistanceToTarget <= 0.0f || DistanceAlongHook <= 0.0f)
+			continue;
+
+		const vec2 ClosestPoint = Pos + Target * DistanceAlongHook;
+		const float ForgivableRadius = std::tan(g_Config.m_TcForgivableHook * pi / 180.0f) * DistanceToTarget;
+		if(distance(OtherPos, ClosestPoint) < CCharacterCore::PhysicalSize() + 2.0f + ForgivableRadius && (ClosestClientId == -1 || DistanceToTarget < ClosestDistance))
+		{
+			ClosestClientId = ClientId;
+			ClosestDistance = DistanceToTarget;
+		}
+	}
+
+	if(ClosestClientId == -1)
+		return;
+
+	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur.m_Y);
+	const vec2 Aim = OtherPos - Pos;
+	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
+	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
+}
+
 int CControls::SnapInput(int *pData)
 {
 	// update player state
@@ -328,6 +372,8 @@ int CControls::SnapInput(int *pData)
 
 		if(!m_aInputData[g_Config.m_ClDummy].m_TargetX && !m_aInputData[g_Config.m_ClDummy].m_TargetY)
 			m_aInputData[g_Config.m_ClDummy].m_TargetX = 1;
+
+		ForgiveHook();
 
 		// set direction
 		m_aInputData[g_Config.m_ClDummy].m_Direction = 0;

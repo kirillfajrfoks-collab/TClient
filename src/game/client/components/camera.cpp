@@ -194,14 +194,7 @@ void CCamera::UpdateCamera()
 		m_Zoom = std::clamp(m_Zoom, MinZoomLevel(), MaxZoomLevel());
 	}
 
-	if(!ZoomAllowed())
-	{
-		m_ZoomSet = false;
-		m_Zoom = 1.0f;
-		m_Zooming = false;
-		m_AutoSpecCameraZooming = false;
-	}
-	else if(!m_ZoomSet && g_Config.m_ClDefaultZoom != 10)
+	if(!m_ZoomSet && g_Config.m_ClDefaultZoom != 10)
 	{
 		m_ZoomSet = true;
 		OnReset();
@@ -432,7 +425,7 @@ void CCamera::ConZoomPlus(IConsole::IResult *pResult, void *pUserData)
 {
 	CCamera *pSelf = (CCamera *)pUserData;
 	if(!pSelf->ZoomAllowed())
-		return;
+		pSelf->GameClient()->Echo("Server не хочет, но мы делаем zoom+");
 
 	float ZoomAmount = pResult->NumArguments() ? pResult->GetFloat(0) : 1.0f;
 
@@ -445,7 +438,7 @@ void CCamera::ConZoomMinus(IConsole::IResult *pResult, void *pUserData)
 {
 	CCamera *pSelf = (CCamera *)pUserData;
 	if(!pSelf->ZoomAllowed())
-		return;
+		pSelf->GameClient()->Echo("Server не хочет, но мы делаем zoom-");
 
 	float ZoomAmount = pResult->NumArguments() ? pResult->GetFloat(0) : 1.0f;
 	ZoomAmount *= -1.0f;
@@ -459,7 +452,7 @@ void CCamera::ConZoom(IConsole::IResult *pResult, void *pUserData)
 {
 	CCamera *pSelf = (CCamera *)pUserData;
 	if(!pSelf->ZoomAllowed())
-		return;
+		pSelf->GameClient()->Echo("Server не хочет, но мы делаем zoom");
 
 	bool IsReset = !pResult->NumArguments();
 

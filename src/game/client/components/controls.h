@@ -62,6 +62,7 @@ public:
 	void ResetInput(int Dummy);
 	bool CheckNewInput();
 	void AvoidFreeze();
+	void ForgiveHook();
 
 private:
 	bool IsFreezeTile(vec2 Pos);
