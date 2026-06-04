@@ -17,6 +17,7 @@
 #include <game/client/components/scoreboard.h>
 #include <game/client/gameclient.h>
 #include <game/collision.h>
+#include <game/mapitems.h>
 
 CControls::CControls()
 {
@@ -36,6 +37,7 @@ void CControls::OnReset()
 		AmmoCount = 0;
 
 	m_LastSendTime = 0;
+	m_AvoidFreezeMessageTick = 0;
 }
 
 void CControls::ResetInput(int Dummy)
@@ -181,6 +183,54 @@ void CControls::OnMessage(int Msg, void *pRawMsg)
 	}
 }
 
+bool CControls::IsFreezeTile(vec2 Pos)
+{
+	const int Index = Collision()->GetPureMapIndex(Pos.x, Pos.y);
+	const int Tile = Collision()->GetTileIndex(Index);
+	const int FrontTile = Collision()->GetFrontTileIndex(Index);
+	return Tile == TILE_FREEZE || Tile == TILE_DFREEZE || Tile == TILE_LFREEZE ||
+	       FrontTile == TILE_FREEZE || FrontTile == TILE_DFREEZE || FrontTile == TILE_LFREEZE;
+}
+
+void CControls::AvoidFreeze()
+{
+	if(!g_Config.m_TcAvoidFreeze || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+
+	const CCharacterCore &Char = GameClient()->m_PredictedChar;
+	if(Char.m_IsInFreeze || m_aInputDirectionLeft[g_Config.m_ClDummy] || m_aInputDirectionRight[g_Config.m_ClDummy])
+		return;
+
+	const vec2 Pos = Char.m_Pos;
+	const vec2 Vel = Char.m_Vel;
+	int AvoidDir = 0;
+
+	for(int Tick = 1; Tick <= 10 && AvoidDir == 0; ++Tick)
+	{
+		const vec2 CheckPos = Pos + Vel * (Tick / 50.0f);
+		static constexpr float s_aOffsetY[] = {-12.0f, 0.0f, 12.0f};
+		for(float OffsetY : s_aOffsetY)
+		{
+			if(IsFreezeTile(CheckPos + vec2(-14.0f, OffsetY)))
+			{
+				AvoidDir = 1;
+				break;
+			}
+			if(IsFreezeTile(CheckPos + vec2(14.0f, OffsetY)))
+			{
+				AvoidDir = -1;
+				break;
+			}
+		}
+	}
+
+	if(AvoidDir == 0)
+		return;
+
+	m_aInputData[g_Config.m_ClDummy].m_Direction = AvoidDir;
+	m_AvoidFreezeMessageTick = Client()->GameTick(g_Config.m_ClDummy) + 10;
+}
+
 int CControls::SnapInput(int *pData)
 {
 	// update player state
@@ -285,6 +335,8 @@ int CControls::SnapInput(int *pData)
 			m_aInputData[g_Config.m_ClDummy].m_Direction = -1;
 		if(!m_aInputDirectionLeft[g_Config.m_ClDummy] && m_aInputDirectionRight[g_Config.m_ClDummy])
 			m_aInputData[g_Config.m_ClDummy].m_Direction = 1;
+
+		AvoidFreeze();
 
 		// dummy copy moves
 		if(g_Config.m_ClDummyCopyMoves)
@@ -407,6 +459,7 @@ void CControls::OnRender()
 	{
 		m_aTargetPos[g_Config.m_ClDummy] = m_aMousePos[g_Config.m_ClDummy];
 	}
+
 }
 
 bool CControls::OnCursorMove(float x, float y, IInput::ECursorType CursorType)

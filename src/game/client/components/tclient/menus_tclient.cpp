@@ -566,6 +566,7 @@ void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
 		Column.HSplitTop(LineSize, nullptr, &Column);
 
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_ClSubTickAiming, TCLocalize("Sub-Tick aiming"), &g_Config.m_ClSubTickAiming, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAvoidFreeze, TCLocalize("Avoid freeze when AFK"), &g_Config.m_TcAvoidFreeze, &Column, LineSize);
 
 	// A little extra spacing because these are multi line
 	Column.HSplitTop(MarginSmall, nullptr, &Column);

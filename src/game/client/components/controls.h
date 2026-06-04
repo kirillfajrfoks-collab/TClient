@@ -44,6 +44,8 @@ public:
 	CNetObj_PlayerInput m_aFastInput[NUM_DUMMIES];
 	bool m_FastInputHookAction = false;
 	bool m_FastInputFireAction = false;
+	int m_AvoidFreezeMessageTick = 0;
+	int AvoidFreezeMessageTick() const { return m_AvoidFreezeMessageTick; }
 
 	CControls();
 	int Sizeof() const override { return sizeof(*this); }
@@ -59,8 +61,10 @@ public:
 	void ClampMousePos();
 	void ResetInput(int Dummy);
 	bool CheckNewInput();
+	void AvoidFreeze();
 
 private:
+	bool IsFreezeTile(vec2 Pos);
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);

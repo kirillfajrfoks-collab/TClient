@@ -570,6 +570,14 @@ void CHud::RenderTextInfo()
 		str_format(aBuf, sizeof(aBuf), "%d", Client()->GetPredictionTime());
 		TextRender()->Text(m_Width - 10 - TextRender()->TextWidth(12, aBuf, -1, -1.0f), Showfps ? 20 : 5, 12, aBuf, -1.0f);
 	}
+	if(g_Config.m_TcAvoidFreeze && Client()->GameTick(g_Config.m_ClDummy) <= GameClient()->m_Controls.AvoidFreezeMessageTick())
+	{
+		const float FontSize = 8.0f;
+		const char *pText = "Avoid freeze";
+		TextRender()->TextColor(ColorRGBA(0.45f, 0.9f, 1.0f, 1.0f));
+		TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(FontSize, pText, -1, -1.0f) / 2.0f, 28.0f, FontSize, pText, -1.0f);
+		TextRender()->TextColor(TextRender()->DefaultTextColor());
+	}
 
 	if(g_Config.m_TcMiniDebug)
 	{
