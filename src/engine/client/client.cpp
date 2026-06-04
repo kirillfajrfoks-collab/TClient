@@ -828,7 +828,7 @@ void CClient::DummyConnect()
 	if(!DummyAllowed())
 	{
 		log_info("client", "Dummy is not allowed on this server.");
-		return;
+		GameClient()->Echo("Server не хочет, но мы делаем Dummy connect");
 	}
 	if(DummyConnecting())
 	{
