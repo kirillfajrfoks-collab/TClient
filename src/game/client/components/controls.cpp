@@ -269,8 +269,8 @@ void CControls::ForgiveHook()
 		return;
 
 	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
-	const float HookLength = GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookLength;
-	const float HookFireSpeed = maximum(1.0f, GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookFireSpeed);
+	const float HookLength = (float)GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookLength;
+	const float HookFireSpeed = maximum(1.0f, (float)GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookFireSpeed);
 	vec2 Target = vec2(m_aInputData[g_Config.m_ClDummy].m_TargetX, m_aInputData[g_Config.m_ClDummy].m_TargetY);
 	if(Target == vec2(0.0f, 0.0f))
 		return;
