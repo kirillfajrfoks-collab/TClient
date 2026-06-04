@@ -269,6 +269,8 @@ void CControls::ForgiveHook()
 		return;
 
 	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
+	const float HookLength = GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookLength;
+	const float HookFireSpeed = maximum(1.0f, GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookFireSpeed);
 	vec2 Target = vec2(m_aInputData[g_Config.m_ClDummy].m_TargetX, m_aInputData[g_Config.m_ClDummy].m_TargetY);
 	if(Target == vec2(0.0f, 0.0f))
 		return;
@@ -278,31 +280,42 @@ void CControls::ForgiveHook()
 	int ClosestClientId = -1;
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
-		if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || GameClient()->IsOtherTeam(ClientId))
+		if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || (g_Config.m_TcPiFuncNotAimTeam && GameClient()->IsOtherTeam(ClientId)))
 			continue;
 
-		const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y);
+		const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
+		const vec2 OtherPos = vec2(Char.m_X, Char.m_Y);
+		const vec2 OtherVel = vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f);
 		const vec2 ToOther = OtherPos - Pos;
 		const float DistanceToTarget = length(ToOther);
+		if(DistanceToTarget > HookLength)
+			continue;
 		const float DistanceAlongHook = dot(ToOther, Target);
-		if(DistanceToTarget <= 0.0f || DistanceAlongHook <= 0.0f)
+		if(DistanceToTarget <= 0.0f || DistanceAlongHook <= 0.0f || DistanceAlongHook > HookLength)
 			continue;
 
-		const vec2 ClosestPoint = Pos + Target * DistanceAlongHook;
+		const float HookTicksToTarget = DistanceToTarget / HookFireSpeed;
+		const vec2 PredictedOtherPos = OtherPos + OtherVel * std::clamp(HookTicksToTarget, 0.0f, 6.0f);
+
+		const vec2 PredictedToOther = PredictedOtherPos - Pos;
+		const float PredictedDistanceAlongHook = dot(PredictedToOther, Target);
+		if(PredictedDistanceAlongHook <= 0.0f || PredictedDistanceAlongHook > HookLength)
+			continue;
+		const vec2 ClosestPoint = Pos + Target * PredictedDistanceAlongHook;
 		const float VanillaRadius = CCharacterCore::PhysicalSize() + 2.0f;
-		if(distance(OtherPos, ClosestPoint) <= VanillaRadius)
+		if(distance(PredictedOtherPos, ClosestPoint) <= VanillaRadius)
 			continue;
 
 		const float ForgivableRadius = std::tan(g_Config.m_TcForgivableHook * pi / 180.0f) * DistanceToTarget;
 		vec2 CollisionPos;
 		int TeleNr = 0;
-		const vec2 Aim = OtherPos - Pos;
+		const vec2 Aim = PredictedOtherPos - Pos;
 		const vec2 AimDir = normalize(Aim);
 		const vec2 HookStart = Pos + AimDir * CCharacterCore::PhysicalSize() * 1.5f;
-		if(Collision()->IntersectLineTeleHook(HookStart, OtherPos, &CollisionPos, nullptr, &TeleNr))
+		if(length(Aim) > HookLength || Collision()->IntersectLineTeleHook(HookStart, PredictedOtherPos, &CollisionPos, nullptr, &TeleNr))
 			continue;
 
-		if(distance(OtherPos, ClosestPoint) < VanillaRadius + ForgivableRadius && (ClosestClientId == -1 || DistanceToTarget < ClosestDistance))
+		if(distance(PredictedOtherPos, ClosestPoint) < VanillaRadius + ForgivableRadius && (ClosestClientId == -1 || DistanceToTarget < ClosestDistance))
 		{
 			ClosestClientId = ClientId;
 			ClosestDistance = DistanceToTarget;
@@ -312,8 +325,12 @@ void CControls::ForgiveHook()
 	if(ClosestClientId == -1)
 		return;
 
-	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur.m_Y);
-	const vec2 Aim = OtherPos - Pos;
+	const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur;
+	const vec2 OtherPos = vec2(Char.m_X, Char.m_Y);
+	const vec2 OtherVel = vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f);
+	const float HookTicksToTarget = distance(Pos, OtherPos) / HookFireSpeed;
+	const vec2 PredictedOtherPos = OtherPos + OtherVel * std::clamp(HookTicksToTarget, 0.0f, 6.0f);
+	const vec2 Aim = PredictedOtherPos - Pos;
 	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
 	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
 }
@@ -328,7 +345,7 @@ void CControls::AutoLed()
 	float ClosestDistance = 0.0f;
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
-		if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || GameClient()->IsOtherTeam(ClientId))
+		if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || (g_Config.m_TcPiFuncNotAimTeam && GameClient()->IsOtherTeam(ClientId)))
 			continue;
 
 		const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
