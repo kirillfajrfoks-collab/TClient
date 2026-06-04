@@ -198,7 +198,7 @@ bool CControls::IsSingleFreezeTile(vec2 Pos)
 	if(!IsFreezeTile(Pos))
 		return false;
 
-	static constexpr vec2 s_aOffsets[] = {vec2(-32.0f, 0.0f), vec2(32.0f, 0.0f), vec2(0.0f, -32.0f), vec2(0.0f, 32.0f)};
+	static const vec2 s_aOffsets[] = {vec2(-32.0f, 0.0f), vec2(32.0f, 0.0f), vec2(0.0f, -32.0f), vec2(0.0f, 32.0f)};
 	for(const vec2 &Offset : s_aOffsets)
 	{
 		if(IsFreezeTile(Pos + Offset))
