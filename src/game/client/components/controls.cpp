@@ -207,6 +207,77 @@ bool CControls::IsSingleFreezeTile(vec2 Pos)
 	return true;
 }
 
+bool CControls::PiFuncCanAimClient(int ClientId) const
+{
+	if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+		return false;
+
+	if(!g_Config.m_TcPiFuncNotAimTeam)
+		return true;
+
+	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
+	if(LocalId < 0)
+		return false;
+
+	const int LocalTeam = GameClient()->m_Teams.Team(LocalId);
+	const int TargetTeam = GameClient()->m_Teams.Team(ClientId);
+	return LocalTeam > 0 && LocalTeam == TargetTeam;
+}
+
+bool CControls::FindHookablePoint(vec2 From, vec2 Dir, vec2 *pTarget) const
+{
+	if(length(Dir) <= 0.0f)
+		return false;
+	Dir = normalize(Dir);
+
+	vec2 CollisionPos;
+	vec2 BeforeCollisionPos;
+	int TeleNr = 0;
+	const int Hit = Collision()->IntersectLineTeleHook(From, From + Dir * (float)GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookLength, &CollisionPos, &BeforeCollisionPos, &TeleNr);
+	if(Hit == TILE_SOLID)
+	{
+		*pTarget = CollisionPos - From;
+		return true;
+	}
+	return false;
+}
+
+bool CControls::FindHookablePlayer(vec2 From, vec2 *pTarget) const
+{
+	int ClosestClientId = -1;
+	float ClosestDistance = 0.0f;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		if(!PiFuncCanAimClient(ClientId))
+			continue;
+
+		const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y);
+		const float Dist = distance(From, OtherPos);
+		if(Dist > (float)GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookLength)
+			continue;
+
+		vec2 CollisionPos;
+		int TeleNr = 0;
+		const vec2 Dir = normalize(OtherPos - From);
+		const vec2 HookStart = From + Dir * CCharacterCore::PhysicalSize() * 1.5f;
+		if(Collision()->IntersectLineTeleHook(HookStart, OtherPos, &CollisionPos, nullptr, &TeleNr))
+			continue;
+
+		if(ClosestClientId == -1 || Dist < ClosestDistance)
+		{
+			ClosestClientId = ClientId;
+			ClosestDistance = Dist;
+		}
+	}
+
+	if(ClosestClientId == -1)
+		return false;
+
+	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur.m_Y);
+	*pTarget = OtherPos - From;
+	return true;
+}
+
 void CControls::AvoidFreeze()
 {
 	if(!g_Config.m_TcAvoidFreeze || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
@@ -272,13 +343,35 @@ void CControls::AvoidFreeze()
 
 	if(AvoidDir != 0)
 		m_aInputData[g_Config.m_ClDummy].m_Direction = AvoidDir;
-	if(HookedByPlayer && FreezeBelow)
-		m_aInputData[g_Config.m_ClDummy].m_Jump = 1;
-	if(HookedByPlayer && FreezeAbove)
+	if(FreezeBelow)
 	{
-		m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
-		m_aInputData[g_Config.m_ClDummy].m_TargetX = 0;
-		m_aInputData[g_Config.m_ClDummy].m_TargetY = 100;
+		vec2 HookTarget;
+		if(FindHookablePoint(Pos, vec2(0.0f, -1.0f), &HookTarget))
+		{
+			m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
+			m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(HookTarget.x);
+			m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(HookTarget.y);
+		}
+		else
+		{
+			m_aInputData[g_Config.m_ClDummy].m_Jump = 1;
+		}
+	}
+	else if(FreezeAbove)
+	{
+		vec2 HookTarget;
+		if(FindHookablePoint(Pos, vec2(0.0f, 1.0f), &HookTarget))
+		{
+			m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
+			m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(HookTarget.x);
+			m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(HookTarget.y);
+		}
+		else if(FindHookablePlayer(Pos, &HookTarget))
+		{
+			m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
+			m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(HookTarget.x);
+			m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(HookTarget.y);
+		}
 	}
 	m_AvoidFreezeMessageTick = Client()->GameTick(g_Config.m_ClDummy) + 10;
 }
@@ -302,7 +395,7 @@ void CControls::ForgiveHook()
 	int ClosestClientId = -1;
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
-		if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || (g_Config.m_TcPiFuncNotAimTeam && GameClient()->IsOtherTeam(ClientId)))
+		if(!PiFuncCanAimClient(ClientId))
 			continue;
 
 		const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
@@ -373,7 +466,7 @@ void CControls::AutoLed()
 	float ClosestDistance = 0.0f;
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
-		if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active || (g_Config.m_TcPiFuncNotAimTeam && GameClient()->IsOtherTeam(ClientId)))
+		if(!PiFuncCanAimClient(ClientId))
 			continue;
 
 		const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;

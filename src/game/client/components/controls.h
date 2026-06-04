@@ -68,6 +68,9 @@ public:
 private:
 	bool IsFreezeTile(vec2 Pos);
 	bool IsSingleFreezeTile(vec2 Pos);
+	bool PiFuncCanAimClient(int ClientId) const;
+	bool FindHookablePoint(vec2 From, vec2 Dir, vec2 *pTarget) const;
+	bool FindHookablePlayer(vec2 From, vec2 *pTarget) const;
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);
