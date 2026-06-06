@@ -587,7 +587,7 @@ void CHud::RenderTextInfo()
 		if(g_Config.m_TcForgivableHook > 0)
 			apItems[NumItems++] = "hook";
 		if(g_Config.m_TcGunAimAssist)
-			apItems[NumItems++] = "gun aim";
+			apItems[NumItems++] = "sg/laser aim";
 		if(g_Config.m_TcAutoLed)
 			apItems[NumItems++] = "autoled";
 		if(g_Config.m_TcAutoHammerNearby)
@@ -604,6 +604,28 @@ void CHud::RenderTextInfo()
 			apItems[NumItems++] = "emote";
 		if(g_Config.m_TcAimCorrectionLog)
 			apItems[NumItems++] = "aim log";
+		if(g_Config.m_TcPiFuncTargetDebug)
+		{
+			static char s_aTargetDebug[64];
+			int Allowed = 0;
+			int Frozen = 0;
+			const int LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy] >= 0 ? GameClient()->m_aLocalIds[g_Config.m_ClDummy] : GameClient()->m_Snap.m_LocalClientId;
+			const int LocalTeam = LocalId >= 0 ? GameClient()->m_Teams.Team(LocalId) : -1;
+			for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+			{
+				if(ClientId == LocalId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+					continue;
+				const int TargetTeam = GameClient()->m_Teams.Team(ClientId);
+				const bool AllowedTarget = !g_Config.m_TcPiFuncNotAimTeam || (LocalId >= 0 && LocalTeam > 0 && TargetTeam == LocalTeam && !GameClient()->m_aClients[ClientId].m_Solo && !GameClient()->m_aClients[LocalId].m_Solo);
+				if(!AllowedTarget)
+					continue;
+				Allowed++;
+				if(GameClient()->m_aClients[ClientId].m_FreezeEnd != 0 || GameClient()->m_aClients[ClientId].m_DeepFrozen || GameClient()->m_aClients[ClientId].m_LiveFrozen)
+					Frozen++;
+			}
+			str_format(s_aTargetDebug, sizeof(s_aTargetDebug), "targets %d frozen %d", Allowed, Frozen);
+			apItems[NumItems++] = s_aTargetDebug;
+		}
 
 		if(NumItems > 0)
 		{

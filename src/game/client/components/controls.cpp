@@ -218,19 +218,19 @@ bool CControls::IsSingleFreezeTile(vec2 Pos)
 
 bool CControls::PiFuncCanAimClient(int ClientId) const
 {
-	if(ClientId == GameClient()->m_Snap.m_LocalClientId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+	const int LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy] >= 0 ? GameClient()->m_aLocalIds[g_Config.m_ClDummy] : GameClient()->m_Snap.m_LocalClientId;
+	if(ClientId == LocalId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
 		return false;
 
 	if(!g_Config.m_TcPiFuncNotAimTeam)
 		return true;
 
-	const int LocalId = GameClient()->m_Snap.m_LocalClientId;
 	if(LocalId < 0)
 		return false;
 
 	const int LocalTeam = GameClient()->m_Teams.Team(LocalId);
 	const int TargetTeam = GameClient()->m_Teams.Team(ClientId);
-	return LocalTeam > 0 && LocalTeam == TargetTeam;
+	return LocalTeam > 0 && TargetTeam == LocalTeam && !GameClient()->m_aClients[ClientId].m_Solo && !GameClient()->m_aClients[LocalId].m_Solo;
 }
 
 bool CControls::IsClientFrozen(int ClientId) const
@@ -533,20 +533,16 @@ void CControls::AutoLed()
 		const vec2 OtherPos = vec2(Char.m_X, Char.m_Y);
 		const vec2 OtherVel = vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f);
 		const float Dist = distance(Pos, OtherPos);
-		if(Dist > 112.0f || IsClientFrozen(ClientId))
+		if(Dist > 140.0f || GameClient()->m_aClients[ClientId].m_HammerHitDisabled)
 			continue;
 
-		bool EntersSingleFreeze = false;
-		for(int Tick = 0; Tick <= 8; ++Tick)
+		bool NeedsLed = IsClientFrozen(ClientId);
+		for(int Tick = 0; Tick <= 10 && !NeedsLed; ++Tick)
 		{
 			const vec2 CheckPos = OtherPos + OtherVel * (float)Tick;
-			if(IsSingleFreezeTile(CheckPos) || IsSingleFreezeTile(CheckPos + vec2(0.0f, 18.0f)))
-			{
-				EntersSingleFreeze = true;
-				break;
-			}
+			NeedsLed = IsFreezeTile(CheckPos) || IsFreezeTile(CheckPos + vec2(0.0f, 18.0f)) || IsFreezeTile(CheckPos + vec2(-14.0f, 14.0f)) || IsFreezeTile(CheckPos + vec2(14.0f, 14.0f));
 		}
-		if(!EntersSingleFreeze)
+		if(!NeedsLed)
 			continue;
 
 		if(TargetClientId == -1 || Dist < ClosestDistance)
@@ -632,7 +628,7 @@ void CControls::GunAimAssist()
 	if(!g_Config.m_TcGunAimAssist || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
 		return;
 	const int Weapon = GameClient()->m_PredictedChar.m_ActiveWeapon;
-	if(Weapon != WEAPON_GUN)
+	if(Weapon != WEAPON_SHOTGUN && Weapon != WEAPON_LASER)
 		return;
 
 	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
@@ -651,7 +647,8 @@ void CControls::GunAimAssist()
 		const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
 		const vec2 OtherPos = vec2(Char.m_X, Char.m_Y);
 		const vec2 OtherVel = vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f);
-		const vec2 Aim = OtherPos + OtherVel * 1.5f - Pos;
+		const float Lead = Weapon == WEAPON_LASER ? 1.0f : 1.8f;
+		const vec2 Aim = OtherPos + OtherVel * Lead - Pos;
 		const float Dist = length(Aim);
 		if(Dist <= 0.0f || Dist > 850.0f)
 			continue;
@@ -676,7 +673,8 @@ void CControls::GunAimAssist()
 		return;
 
 	const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[BestClientId].m_Cur;
-	const vec2 Aim = vec2(Char.m_X, Char.m_Y) + vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f) * 1.5f - Pos;
+	const float Lead = Weapon == WEAPON_LASER ? 1.0f : 1.8f;
+	const vec2 Aim = vec2(Char.m_X, Char.m_Y) + vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f) * Lead - Pos;
 	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
 	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
 }

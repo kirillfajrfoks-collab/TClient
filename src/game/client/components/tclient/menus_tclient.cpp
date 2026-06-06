@@ -396,20 +396,21 @@ void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAvoidFreeze, TCLocalize("Avoid freeze when AFK"), &g_Config.m_TcAvoidFreeze, &Column, LineSize);
 	Column.HSplitTop(LineSize, &Button, &Column);
 	Ui()->DoScrollbarOption(&g_Config.m_TcForgivableHook, &g_Config.m_TcForgivableHook, &Button, TCLocalize("Forgivable hook"), 0, 45, &CUi::ms_LinearScrollbarScale, 0, " deg");
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcGunAimAssist, TCLocalize("Gun aim assist"), &g_Config.m_TcGunAimAssist, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcGunAimAssist, TCLocalize("Shotgun/Laser aim assist"), &g_Config.m_TcGunAimAssist, &Column, LineSize);
 	Column.HSplitTop(LineSize, &Button, &Column);
-	Ui()->DoScrollbarOption(&g_Config.m_TcGunAimAssistAngle, &g_Config.m_TcGunAimAssistAngle, &Button, TCLocalize("Gun aim cone"), 1, 30, &CUi::ms_LinearScrollbarScale, 0, " deg");
+	Ui()->DoScrollbarOption(&g_Config.m_TcGunAimAssistAngle, &g_Config.m_TcGunAimAssistAngle, &Button, TCLocalize("Weapon aim cone"), 1, 30, &CUi::ms_LinearScrollbarScale, 0, " deg");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncNotAimTeam, TCLocalize("Not aim !team"), &g_Config.m_TcPiFuncNotAimTeam, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAimCorrectionLog, TCLocalize("Log aim correction data"), &g_Config.m_TcAimCorrectionLog, &Column, LineSize);
 
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 	Section = Column;
-	Section.h = 60.0f;
+	Section.h = 80.0f;
 	Section.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 10.0f);
 	Column.HSplitTop(HeadlineHeight, &Label, &Column);
 	Ui()->DoLabel(&Label, TCLocalize("Visuals"), HeadlineFontSize, TEXTALIGN_ML);
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncHud, TCLocalize("Small PiFunc HUD"), &g_Config.m_TcPiFuncHud, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncTargetDebug, TCLocalize("PiFunc target debug"), &g_Config.m_TcPiFuncTargetDebug, &Column, LineSize);
 
 	Column = RightView;
 	Section = Column;
