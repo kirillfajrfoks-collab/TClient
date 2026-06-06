@@ -66,6 +66,8 @@ MACRO_CONFIG_INT(TcPiFuncNotAimTeam, tc_pifunc_not_aim_team, 1, 0, 1, CFGFLAG_CL
 MACRO_CONFIG_INT(TcAutoLed, tc_autoled, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically hammer teammates entering single freeze tiles")
 MACRO_CONFIG_INT(TcAutoHammerNearby, tc_auto_hammer_nearby, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically hammer nearby allowed players")
 MACRO_CONFIG_INT(TcFollowTee, tc_follow_tee, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Follow nearest allowed tee movement")
+MACRO_CONFIG_INT(TcBalanceBot, tc_balance_bot, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep yourself balanced on another tee's head")
+MACRO_CONFIG_INT(TcAutoDummySave, tc_auto_dummy_save, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use dummy control to hook the main tee when it falls")
 
 MACRO_CONFIG_INT(TcAntiPingImproved, tc_antiping_improved, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Different antiping smoothing algorithm, not compatible with cl_antiping_smooth")
 MACRO_CONFIG_INT(TcAntiPingNegativeBuffer, tc_antiping_negative_buffer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Helps in Gores. Allows internal certainty value to be negative which causes more conservative prediction")

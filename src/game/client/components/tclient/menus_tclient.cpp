@@ -395,6 +395,8 @@ void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoLed, TCLocalize("Autoled single freeze"), &g_Config.m_TcAutoLed, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoHammerNearby, TCLocalize("Auto hammer nearby"), &g_Config.m_TcAutoHammerNearby, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFollowTee, TCLocalize("Follow nearest tee"), &g_Config.m_TcFollowTee, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcBalanceBot, TCLocalize("Balance bot"), &g_Config.m_TcBalanceBot, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoDummySave, TCLocalize("Auto dummy save"), &g_Config.m_TcAutoDummySave, &Column, LineSize);
 }
 
 void CMenus::RenderSettingsTClientSettings(CUIRect MainView)

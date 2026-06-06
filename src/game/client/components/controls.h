@@ -45,6 +45,8 @@ public:
 	bool m_FastInputHookAction = false;
 	bool m_FastInputFireAction = false;
 	int m_AvoidFreezeMessageTick = 0;
+	bool m_AvoidFreezeJumped = false;
+	bool m_AutoDummySaveActive = false;
 	int AvoidFreezeMessageTick() const { return m_AvoidFreezeMessageTick; }
 
 	CControls();
@@ -66,6 +68,8 @@ public:
 	void AutoLed();
 	void AutoHammerNearby();
 	void FollowTee();
+	void BalanceBot();
+	void AutoDummySave();
 
 private:
 	bool IsFreezeTile(vec2 Pos);
