@@ -393,6 +393,8 @@ void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 	Ui()->DoScrollbarOption(&g_Config.m_TcForgivableHook, &g_Config.m_TcForgivableHook, &Button, TCLocalize("Forgivable hook"), 0, 45, &CUi::ms_LinearScrollbarScale, 0, " deg");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncNotAimTeam, TCLocalize("Not aim !team"), &g_Config.m_TcPiFuncNotAimTeam, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoLed, TCLocalize("Autoled single freeze"), &g_Config.m_TcAutoLed, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoHammerNearby, TCLocalize("Auto hammer nearby"), &g_Config.m_TcAutoHammerNearby, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFollowTee, TCLocalize("Follow nearest tee"), &g_Config.m_TcFollowTee, &Column, LineSize);
 }
 
 void CMenus::RenderSettingsTClientSettings(CUIRect MainView)

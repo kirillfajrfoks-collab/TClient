@@ -224,60 +224,6 @@ bool CControls::PiFuncCanAimClient(int ClientId) const
 	return LocalTeam > 0 && LocalTeam == TargetTeam;
 }
 
-bool CControls::FindHookablePoint(vec2 From, vec2 Dir, vec2 *pTarget) const
-{
-	if(length(Dir) <= 0.0f)
-		return false;
-	Dir = normalize(Dir);
-
-	vec2 CollisionPos;
-	vec2 BeforeCollisionPos;
-	int TeleNr = 0;
-	const int Hit = Collision()->IntersectLineTeleHook(From, From + Dir * (float)GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookLength, &CollisionPos, &BeforeCollisionPos, &TeleNr);
-	if(Hit == TILE_SOLID)
-	{
-		*pTarget = CollisionPos - From;
-		return true;
-	}
-	return false;
-}
-
-bool CControls::FindHookablePlayer(vec2 From, vec2 *pTarget) const
-{
-	int ClosestClientId = -1;
-	float ClosestDistance = 0.0f;
-	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
-	{
-		if(!PiFuncCanAimClient(ClientId))
-			continue;
-
-		const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y);
-		const float Dist = distance(From, OtherPos);
-		if(Dist > (float)GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookLength)
-			continue;
-
-		vec2 CollisionPos;
-		int TeleNr = 0;
-		const vec2 Dir = normalize(OtherPos - From);
-		const vec2 HookStart = From + Dir * CCharacterCore::PhysicalSize() * 1.5f;
-		if(Collision()->IntersectLineTeleHook(HookStart, OtherPos, &CollisionPos, nullptr, &TeleNr))
-			continue;
-
-		if(ClosestClientId == -1 || Dist < ClosestDistance)
-		{
-			ClosestClientId = ClientId;
-			ClosestDistance = Dist;
-		}
-	}
-
-	if(ClosestClientId == -1)
-		return false;
-
-	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur.m_Y);
-	*pTarget = OtherPos - From;
-	return true;
-}
-
 void CControls::AvoidFreeze()
 {
 	if(!g_Config.m_TcAvoidFreeze || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
@@ -343,35 +289,13 @@ void CControls::AvoidFreeze()
 
 	if(AvoidDir != 0)
 		m_aInputData[g_Config.m_ClDummy].m_Direction = AvoidDir;
-	if(FreezeBelow)
+	if(HookedByPlayer && FreezeBelow)
+		m_aInputData[g_Config.m_ClDummy].m_Jump = 1;
+	if(HookedByPlayer && FreezeAbove)
 	{
-		vec2 HookTarget;
-		if(FindHookablePoint(Pos, vec2(0.0f, -1.0f), &HookTarget))
-		{
-			m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
-			m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(HookTarget.x);
-			m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(HookTarget.y);
-		}
-		else
-		{
-			m_aInputData[g_Config.m_ClDummy].m_Jump = 1;
-		}
-	}
-	else if(FreezeAbove)
-	{
-		vec2 HookTarget;
-		if(FindHookablePoint(Pos, vec2(0.0f, 1.0f), &HookTarget))
-		{
-			m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
-			m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(HookTarget.x);
-			m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(HookTarget.y);
-		}
-		else if(FindHookablePlayer(Pos, &HookTarget))
-		{
-			m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
-			m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(HookTarget.x);
-			m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(HookTarget.y);
-		}
+		m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
+		m_aInputData[g_Config.m_ClDummy].m_TargetX = 0;
+		m_aInputData[g_Config.m_ClDummy].m_TargetY = 100;
 	}
 	m_AvoidFreezeMessageTick = Client()->GameTick(g_Config.m_ClDummy) + 10;
 }
@@ -510,6 +434,90 @@ void CControls::AutoLed()
 	m_aInputData[g_Config.m_ClDummy].m_Fire &= INPUT_STATE_MASK;
 }
 
+void CControls::AutoHammerNearby()
+{
+	if(!g_Config.m_TcAutoHammerNearby || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+
+	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
+	int TargetClientId = -1;
+	float ClosestDistance = 0.0f;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		if(!PiFuncCanAimClient(ClientId))
+			continue;
+
+		const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y);
+		const float Dist = distance(Pos, OtherPos);
+		if(Dist > CCharacterCore::PhysicalSize() * 1.75f)
+			continue;
+
+		if(TargetClientId == -1 || Dist < ClosestDistance)
+		{
+			TargetClientId = ClientId;
+			ClosestDistance = Dist;
+		}
+	}
+
+	if(TargetClientId == -1)
+		return;
+
+	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_Y);
+	const vec2 Aim = OtherPos - Pos;
+	m_aInputData[g_Config.m_ClDummy].m_WantedWeapon = WEAPON_HAMMER + 1;
+	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
+	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
+	if(GameClient()->m_PredictedChar.m_ActiveWeapon != WEAPON_HAMMER && GameClient()->m_Snap.m_pLocalCharacter->m_Weapon != WEAPON_HAMMER)
+		return;
+	if((m_aInputData[g_Config.m_ClDummy].m_Fire & 1) == 0)
+		m_aInputData[g_Config.m_ClDummy].m_Fire++;
+	m_aInputData[g_Config.m_ClDummy].m_Fire &= INPUT_STATE_MASK;
+}
+
+void CControls::FollowTee()
+{
+	if(!g_Config.m_TcFollowTee || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter || m_aInputDirectionLeft[g_Config.m_ClDummy] || m_aInputDirectionRight[g_Config.m_ClDummy])
+		return;
+	if(Client()->GameTick(g_Config.m_ClDummy) <= m_AvoidFreezeMessageTick)
+		return;
+
+	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
+	int TargetClientId = -1;
+	float ClosestDistance = 0.0f;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		if(!PiFuncCanAimClient(ClientId))
+			continue;
+
+		const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y);
+		const float Dist = distance(Pos, OtherPos);
+		if(Dist > 700.0f)
+			continue;
+
+		if(TargetClientId == -1 || Dist < ClosestDistance)
+		{
+			TargetClientId = ClientId;
+			ClosestDistance = Dist;
+		}
+	}
+
+	if(TargetClientId == -1)
+		return;
+
+	const CNetObj_Character &Target = GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur;
+	const vec2 OtherPos = vec2(Target.m_X, Target.m_Y);
+	const vec2 OtherVel = vec2(Target.m_VelX / 256.0f, Target.m_VelY / 256.0f);
+	const float DesiredDistance = 96.0f;
+	const float DeltaX = OtherPos.x - Pos.x;
+	if(absolute(DeltaX) > DesiredDistance)
+		m_aInputData[g_Config.m_ClDummy].m_Direction = DeltaX > 0.0f ? 1 : -1;
+	else if(absolute(OtherVel.x) > 5.0f)
+		m_aInputData[g_Config.m_ClDummy].m_Direction = OtherVel.x > 0.0f ? 1 : -1;
+
+	if(OtherPos.y + 48.0f < Pos.y || (OtherVel.y < -7.0f && distance(Pos, OtherPos) < 160.0f))
+		m_aInputData[g_Config.m_ClDummy].m_Jump = 1;
+}
+
 int CControls::SnapInput(int *pData)
 {
 	// update player state
@@ -610,6 +618,7 @@ int CControls::SnapInput(int *pData)
 
 		ForgiveHook();
 		AutoLed();
+		AutoHammerNearby();
 
 		// set direction
 		m_aInputData[g_Config.m_ClDummy].m_Direction = 0;
@@ -619,6 +628,7 @@ int CControls::SnapInput(int *pData)
 			m_aInputData[g_Config.m_ClDummy].m_Direction = 1;
 
 		AvoidFreeze();
+		FollowTee();
 
 		// dummy copy moves
 		if(g_Config.m_ClDummyCopyMoves)
