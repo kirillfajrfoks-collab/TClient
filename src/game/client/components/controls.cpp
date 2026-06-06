@@ -2,6 +2,8 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "controls.h"
 
+#include <algorithm>
+
 #include <base/io.h>
 #include <base/math.h>
 #include <base/time.h>
@@ -43,6 +45,9 @@ void CControls::OnReset()
 	m_AvoidFreezeMessageTick = 0;
 	m_LastEmoteSpamTime = 0;
 	m_EmoteSpamIndex = 0;
+	m_AimCorrectionPendingTick = -1;
+	m_AimCorrectionPendingClientId = -1;
+	m_AimCorrectionPendingLateralMiss = 0.0f;
 }
 
 void CControls::ResetInput(int Dummy)
@@ -228,6 +233,26 @@ bool CControls::PiFuncCanAimClient(int ClientId) const
 	return LocalTeam > 0 && LocalTeam == TargetTeam;
 }
 
+bool CControls::IsClientFrozen(int ClientId) const
+{
+	if(ClientId < 0 || ClientId >= MAX_CLIENTS || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+		return false;
+	return GameClient()->m_aClients[ClientId].m_FreezeEnd != 0 || GameClient()->m_aClients[ClientId].m_DeepFrozen || GameClient()->m_aClients[ClientId].m_LiveFrozen;
+}
+
+void CControls::HammerTarget(vec2 Pos, vec2 TargetPos)
+{
+	const vec2 Aim = TargetPos - Pos;
+	m_aInputData[g_Config.m_ClDummy].m_WantedWeapon = WEAPON_HAMMER + 1;
+	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
+	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
+	if(GameClient()->m_PredictedChar.m_ActiveWeapon != WEAPON_HAMMER && GameClient()->m_Snap.m_pLocalCharacter->m_Weapon != WEAPON_HAMMER)
+		return;
+	if((m_aInputData[g_Config.m_ClDummy].m_Fire & 1) == 0)
+		m_aInputData[g_Config.m_ClDummy].m_Fire++;
+	m_aInputData[g_Config.m_ClDummy].m_Fire &= INPUT_STATE_MASK;
+}
+
 void CControls::LogAimCorrection(int ClientId, vec2 Pos, vec2 TargetPos, vec2 TargetVel, vec2 OldAim, vec2 NewAim, float TravelTicks, float LateralMiss)
 {
 	if(!g_Config.m_TcAimCorrectionLog)
@@ -250,6 +275,53 @@ void CControls::LogAimCorrection(int ClientId, vec2 Pos, vec2 TargetPos, vec2 Ta
 		Client()->GameTick(g_Config.m_ClDummy), ClientId, Pos.x, Pos.y, TargetPos.x, TargetPos.y, TargetVel.x, TargetVel.y, OldAim.x, OldAim.y, NewAim.x, NewAim.y, TravelTicks, LateralMiss);
 	io_write(File, aLine, str_length(aLine));
 	io_close(File);
+
+	m_AimCorrectionPendingTick = Client()->GameTick(g_Config.m_ClDummy);
+	m_AimCorrectionPendingClientId = ClientId;
+	m_AimCorrectionPendingLateralMiss = LateralMiss;
+}
+
+void CControls::LogAimCorrectionResult()
+{
+	if(!g_Config.m_TcAimCorrectionLog || m_AimCorrectionPendingTick < 0 || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+
+	const int CurrentTick = Client()->GameTick(g_Config.m_ClDummy);
+	const int Age = CurrentTick - m_AimCorrectionPendingTick;
+	if(Age < 2)
+		return;
+	if(Age > 18)
+	{
+		m_AimCorrectionPendingTick = -1;
+		return;
+	}
+
+	const int HookedPlayer = GameClient()->m_PredictedChar.HookedPlayer();
+	if(HookedPlayer == -1 && Age < 10)
+		return;
+
+	Storage()->CreateFolder("pifunc", IStorage::TYPE_SAVE);
+	IOHANDLE File = Storage()->OpenFile("pifunc/aim_correction_result.csv", IOFLAG_APPEND, IStorage::TYPE_SAVE);
+	if(!File)
+	{
+		m_AimCorrectionPendingTick = -1;
+		return;
+	}
+
+	if(!m_AimCorrectionResultLogHeaderWritten)
+	{
+		static const char s_aHeader[] = "correction_tick,result_tick,target_client_id,hooked_client_id,success,age_ticks,lateral_miss\n";
+		io_write(File, s_aHeader, sizeof(s_aHeader) - 1);
+		m_AimCorrectionResultLogHeaderWritten = true;
+	}
+
+	char aLine[256];
+	str_format(aLine, sizeof(aLine), "%d,%d,%d,%d,%d,%d,%.3f\n",
+		m_AimCorrectionPendingTick, CurrentTick, m_AimCorrectionPendingClientId, HookedPlayer, HookedPlayer == m_AimCorrectionPendingClientId, Age, m_AimCorrectionPendingLateralMiss);
+	io_write(File, aLine, str_length(aLine));
+	io_close(File);
+
+	m_AimCorrectionPendingTick = -1;
 }
 
 void CControls::AvoidFreeze()
@@ -380,7 +452,7 @@ void CControls::ForgiveHook()
 		if(LateralMiss <= VanillaRadius)
 			continue;
 
-		const float ForgivableRadius = std::min(std::tan(g_Config.m_TcForgivableHook * pi / 180.0f) * DistanceToTarget, 64.0f);
+		const float ForgivableRadius = std::min((float)std::tan(g_Config.m_TcForgivableHook * pi / 180.0f) * DistanceToTarget, 64.0f);
 		vec2 CollisionPos;
 		int TeleNr = 0;
 		const vec2 Aim = PredictedOtherPos - Pos;
@@ -413,9 +485,15 @@ void CControls::ForgiveHook()
 	if(std::acos(Dot) > g_Config.m_TcForgivableHook * pi / 180.0f)
 		return;
 	const vec2 OldAim = vec2(m_aInputData[g_Config.m_ClDummy].m_TargetX, m_aInputData[g_Config.m_ClDummy].m_TargetY);
-	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
-	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
-	LogAimCorrection(ClosestClientId, Pos, OtherPos, OtherVel, OldAim, Aim, ClosestTravelTicks, BestLateralMiss);
+	const float OldLength = maximum(1.0f, length(OldAim));
+	const vec2 OldDir = normalize(OldAim);
+	const vec2 AimDir = normalize(Aim);
+	const float AssistStrength = std::clamp((BestLateralMiss - CCharacterCore::PhysicalSize()) / 56.0f, 0.25f, 0.72f);
+	const vec2 CorrectedDir = normalize(OldDir * (1.0f - AssistStrength) + AimDir * AssistStrength);
+	const vec2 CorrectedAim = CorrectedDir * OldLength;
+	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(CorrectedAim.x);
+	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(CorrectedAim.y);
+	LogAimCorrection(ClosestClientId, Pos, OtherPos, OtherVel, OldAim, CorrectedAim, ClosestTravelTicks, BestLateralMiss);
 }
 
 void CControls::EmoteSpammer()
@@ -424,7 +502,8 @@ void CControls::EmoteSpammer()
 		return;
 
 	const int64_t Now = time_get();
-	const int64_t Delay = time_freq() * maximum(100, g_Config.m_TcEmoteSpammerDelay) / 1000;
+	const int DelayMs = g_Config.m_TcEmoteSpammerDelay < 100 ? 100 : g_Config.m_TcEmoteSpammerDelay;
+	const int64_t Delay = time_freq() * DelayMs / 1000;
 	if(m_LastEmoteSpamTime && Now - m_LastEmoteSpamTime < Delay)
 		return;
 
@@ -454,13 +533,14 @@ void CControls::AutoLed()
 		const vec2 OtherPos = vec2(Char.m_X, Char.m_Y);
 		const vec2 OtherVel = vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f);
 		const float Dist = distance(Pos, OtherPos);
-		if(Dist > CCharacterCore::PhysicalSize() * 2.5f)
+		if(Dist > 112.0f || IsClientFrozen(ClientId))
 			continue;
 
 		bool EntersSingleFreeze = false;
-		for(int Tick = 1; Tick <= 4; ++Tick)
+		for(int Tick = 0; Tick <= 8; ++Tick)
 		{
-			if(IsSingleFreezeTile(OtherPos + OtherVel * Tick))
+			const vec2 CheckPos = OtherPos + OtherVel * (float)Tick;
+			if(IsSingleFreezeTile(CheckPos) || IsSingleFreezeTile(CheckPos + vec2(0.0f, 18.0f)))
 			{
 				EntersSingleFreeze = true;
 				break;
@@ -480,15 +560,7 @@ void CControls::AutoLed()
 		return;
 
 	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_Y);
-	const vec2 Aim = OtherPos - Pos;
-	m_aInputData[g_Config.m_ClDummy].m_WantedWeapon = WEAPON_HAMMER + 1;
-	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
-	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
-	if(GameClient()->m_PredictedChar.m_ActiveWeapon != WEAPON_HAMMER && GameClient()->m_Snap.m_pLocalCharacter->m_Weapon != WEAPON_HAMMER)
-		return;
-	if((m_aInputData[g_Config.m_ClDummy].m_Fire & 1) == 0)
-		m_aInputData[g_Config.m_ClDummy].m_Fire++;
-	m_aInputData[g_Config.m_ClDummy].m_Fire &= INPUT_STATE_MASK;
+	HammerTarget(Pos, OtherPos);
 }
 
 void CControls::AutoHammerNearby()
@@ -520,15 +592,93 @@ void CControls::AutoHammerNearby()
 		return;
 
 	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_Y);
-	const vec2 Aim = OtherPos - Pos;
-	m_aInputData[g_Config.m_ClDummy].m_WantedWeapon = WEAPON_HAMMER + 1;
+	HammerTarget(Pos, OtherPos);
+}
+
+void CControls::AutoHammerFrozenTeam()
+{
+	if(!g_Config.m_TcAutoHammerFrozenTeam || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+
+	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
+	int TargetClientId = -1;
+	float ClosestDistance = 0.0f;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		if(!PiFuncCanAimClient(ClientId) || !IsClientFrozen(ClientId))
+			continue;
+
+		const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur.m_Y);
+		const float Dist = distance(Pos, OtherPos);
+		if(Dist > 76.0f)
+			continue;
+
+		if(TargetClientId == -1 || Dist < ClosestDistance)
+		{
+			TargetClientId = ClientId;
+			ClosestDistance = Dist;
+		}
+	}
+
+	if(TargetClientId == -1)
+		return;
+
+	const vec2 OtherPos = vec2(GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_X, GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur.m_Y);
+	HammerTarget(Pos, OtherPos);
+}
+
+void CControls::GunAimAssist()
+{
+	if(!g_Config.m_TcGunAimAssist || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+	const int Weapon = GameClient()->m_PredictedChar.m_ActiveWeapon;
+	if(Weapon != WEAPON_GUN)
+		return;
+
+	const vec2 Pos = GameClient()->m_PredictedChar.m_Pos;
+	vec2 Target = vec2(m_aInputData[g_Config.m_ClDummy].m_TargetX, m_aInputData[g_Config.m_ClDummy].m_TargetY);
+	if(Target == vec2(0.0f, 0.0f))
+		return;
+	Target = normalize(Target);
+
+	int BestClientId = -1;
+	float BestAngle = 0.0f;
+	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+	{
+		if(!PiFuncCanAimClient(ClientId))
+			continue;
+
+		const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
+		const vec2 OtherPos = vec2(Char.m_X, Char.m_Y);
+		const vec2 OtherVel = vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f);
+		const vec2 Aim = OtherPos + OtherVel * 1.5f - Pos;
+		const float Dist = length(Aim);
+		if(Dist <= 0.0f || Dist > 850.0f)
+			continue;
+
+		vec2 CollisionPos;
+		int TeleNr = 0;
+		if(Collision()->IntersectLineTeleWeapon(Pos, OtherPos, &CollisionPos, nullptr, &TeleNr))
+			continue;
+
+		const float Angle = std::acos(std::clamp(dot(normalize(Aim), Target), -1.0f, 1.0f));
+		if(Angle > g_Config.m_TcGunAimAssistAngle * pi / 180.0f)
+			continue;
+
+		if(BestClientId == -1 || Angle < BestAngle)
+		{
+			BestClientId = ClientId;
+			BestAngle = Angle;
+		}
+	}
+
+	if(BestClientId == -1)
+		return;
+
+	const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[BestClientId].m_Cur;
+	const vec2 Aim = vec2(Char.m_X, Char.m_Y) + vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f) * 1.5f - Pos;
 	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
 	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
-	if(GameClient()->m_PredictedChar.m_ActiveWeapon != WEAPON_HAMMER && GameClient()->m_Snap.m_pLocalCharacter->m_Weapon != WEAPON_HAMMER)
-		return;
-	if((m_aInputData[g_Config.m_ClDummy].m_Fire & 1) == 0)
-		m_aInputData[g_Config.m_ClDummy].m_Fire++;
-	m_aInputData[g_Config.m_ClDummy].m_Fire &= INPUT_STATE_MASK;
 }
 
 void CControls::FollowTee()
@@ -593,11 +743,11 @@ void CControls::BalanceBot()
 		const CNetObj_Character &Target = GameClient()->m_Snap.m_aCharacters[ClientId].m_Cur;
 		const vec2 OtherPos = vec2(Target.m_X, Target.m_Y);
 		const float Dx = OtherPos.x - Pos.x;
-		const float Dy = Pos.y - OtherPos.y;
-		if(absolute(Dx) > 96.0f || Dy < 22.0f || Dy > 86.0f)
+		const float Dy = OtherPos.y - Pos.y;
+		if(absolute(Dx) > 240.0f || Dy < 18.0f || Dy > 150.0f)
 			continue;
 
-		const float Score = absolute(Dx) + absolute(Dy - 48.0f) * 0.5f;
+		const float Score = absolute(Dx) + absolute(Dy - 52.0f) * 0.35f;
 		if(TargetClientId == -1 || Score < ClosestScore)
 		{
 			TargetClientId = ClientId;
@@ -611,15 +761,15 @@ void CControls::BalanceBot()
 	const CNetObj_Character &Target = GameClient()->m_Snap.m_aCharacters[TargetClientId].m_Cur;
 	const vec2 OtherPos = vec2(Target.m_X, Target.m_Y);
 	const vec2 OtherVel = vec2(Target.m_VelX / 256.0f, Target.m_VelY / 256.0f);
-	const float PredictedCenterX = OtherPos.x + OtherVel.x * 2.0f;
+	const float PredictedCenterX = OtherPos.x + OtherVel.x * 3.0f;
 	const float ErrorX = PredictedCenterX - Pos.x;
 
-	if(absolute(ErrorX) > 4.0f)
+	if(absolute(ErrorX) > 10.0f)
 		m_aInputData[g_Config.m_ClDummy].m_Direction = ErrorX > 0.0f ? 1 : -1;
-	else if(absolute(OtherVel.x) > 3.0f)
+	else if(absolute(OtherVel.x) > 4.0f)
 		m_aInputData[g_Config.m_ClDummy].m_Direction = OtherVel.x > 0.0f ? 1 : -1;
 
-	if(Pos.y - OtherPos.y < 38.0f && GameClient()->m_PredictedChar.m_Vel.y > 0.0f)
+	if(OtherPos.y - Pos.y < 42.0f && GameClient()->m_PredictedChar.m_Vel.y > 0.0f)
 		m_aInputData[g_Config.m_ClDummy].m_Jump = 1;
 }
 
@@ -633,7 +783,7 @@ void CControls::AutoDummySave()
 		}
 	};
 
-	if(!g_Config.m_TcAutoDummySave || !Client()->DummyConnected() || GameClient()->m_aLocalIds[0] < 0 || GameClient()->m_aLocalIds[1] < 0)
+	if(!g_Config.m_TcAutoDummySave || !Client()->DummyConnected() || !g_Config.m_ClDummyControl || GameClient()->m_aLocalIds[0] < 0 || GameClient()->m_aLocalIds[1] < 0)
 	{
 		ResetAutoDummySave();
 		return;
@@ -675,7 +825,6 @@ void CControls::AutoDummySave()
 		return;
 	}
 
-	g_Config.m_ClDummyControl = 1;
 	g_Config.m_ClDummyHook = 1;
 	g_Config.m_ClDummyJump = 0;
 	g_Config.m_ClDummyFire = 0;
@@ -784,10 +933,13 @@ int CControls::SnapInput(int *pData)
 		if(!m_aInputData[g_Config.m_ClDummy].m_TargetX && !m_aInputData[g_Config.m_ClDummy].m_TargetY)
 			m_aInputData[g_Config.m_ClDummy].m_TargetX = 1;
 
+		LogAimCorrectionResult();
+		GunAimAssist();
 		ForgiveHook();
 		EmoteSpammer();
 		AutoLed();
 		AutoHammerNearby();
+		AutoHammerFrozenTeam();
 		AutoDummySave();
 
 		// set direction

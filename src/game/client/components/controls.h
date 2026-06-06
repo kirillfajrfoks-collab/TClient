@@ -50,6 +50,10 @@ public:
 	int64_t m_LastEmoteSpamTime = 0;
 	int m_EmoteSpamIndex = 0;
 	bool m_AimCorrectionLogHeaderWritten = false;
+	bool m_AimCorrectionResultLogHeaderWritten = false;
+	int m_AimCorrectionPendingTick = -1;
+	int m_AimCorrectionPendingClientId = -1;
+	float m_AimCorrectionPendingLateralMiss = 0.0f;
 	int AvoidFreezeMessageTick() const { return m_AvoidFreezeMessageTick; }
 
 	CControls();
@@ -70,6 +74,8 @@ public:
 	void ForgiveHook();
 	void AutoLed();
 	void AutoHammerNearby();
+	void AutoHammerFrozenTeam();
+	void GunAimAssist();
 	void FollowTee();
 	void BalanceBot();
 	void AutoDummySave();
@@ -78,8 +84,11 @@ public:
 private:
 	bool IsFreezeTile(vec2 Pos);
 	bool IsSingleFreezeTile(vec2 Pos);
+	bool IsClientFrozen(int ClientId) const;
+	void HammerTarget(vec2 Pos, vec2 TargetPos);
 	bool PiFuncCanAimClient(int ClientId) const;
 	void LogAimCorrection(int ClientId, vec2 Pos, vec2 TargetPos, vec2 TargetVel, vec2 OldAim, vec2 NewAim, float TravelTicks, float LateralMiss);
+	void LogAimCorrectionResult();
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);

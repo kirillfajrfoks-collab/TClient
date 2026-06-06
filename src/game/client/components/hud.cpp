@@ -580,16 +580,20 @@ void CHud::RenderTextInfo()
 	}
 	if(g_Config.m_TcPiFuncHud)
 	{
-		const char *apItems[12];
+		const char *apItems[14];
 		int NumItems = 0;
 		if(g_Config.m_TcAvoidFreeze)
 			apItems[NumItems++] = "avoid";
 		if(g_Config.m_TcForgivableHook > 0)
 			apItems[NumItems++] = "hook";
+		if(g_Config.m_TcGunAimAssist)
+			apItems[NumItems++] = "gun aim";
 		if(g_Config.m_TcAutoLed)
 			apItems[NumItems++] = "autoled";
 		if(g_Config.m_TcAutoHammerNearby)
 			apItems[NumItems++] = "hammer";
+		if(g_Config.m_TcAutoHammerFrozenTeam)
+			apItems[NumItems++] = "frozen hammer";
 		if(g_Config.m_TcFollowTee)
 			apItems[NumItems++] = "follow";
 		if(g_Config.m_TcBalanceBot)

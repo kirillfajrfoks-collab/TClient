@@ -388,7 +388,7 @@ void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 
 	Column = LeftView;
 	Section = Column;
-	Section.h = 125.0f;
+	Section.h = 165.0f;
 	Section.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 10.0f);
 	Column.HSplitTop(HeadlineHeight, &Label, &Column);
 	Ui()->DoLabel(&Label, TCLocalize("Safety / Aim"), HeadlineFontSize, TEXTALIGN_ML);
@@ -396,6 +396,9 @@ void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAvoidFreeze, TCLocalize("Avoid freeze when AFK"), &g_Config.m_TcAvoidFreeze, &Column, LineSize);
 	Column.HSplitTop(LineSize, &Button, &Column);
 	Ui()->DoScrollbarOption(&g_Config.m_TcForgivableHook, &g_Config.m_TcForgivableHook, &Button, TCLocalize("Forgivable hook"), 0, 45, &CUi::ms_LinearScrollbarScale, 0, " deg");
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcGunAimAssist, TCLocalize("Gun aim assist"), &g_Config.m_TcGunAimAssist, &Column, LineSize);
+	Column.HSplitTop(LineSize, &Button, &Column);
+	Ui()->DoScrollbarOption(&g_Config.m_TcGunAimAssistAngle, &g_Config.m_TcGunAimAssistAngle, &Button, TCLocalize("Gun aim cone"), 1, 30, &CUi::ms_LinearScrollbarScale, 0, " deg");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncNotAimTeam, TCLocalize("Not aim !team"), &g_Config.m_TcPiFuncNotAimTeam, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAimCorrectionLog, TCLocalize("Log aim correction data"), &g_Config.m_TcAimCorrectionLog, &Column, LineSize);
 
@@ -410,13 +413,14 @@ void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 
 	Column = RightView;
 	Section = Column;
-	Section.h = 135.0f;
+	Section.h = 155.0f;
 	Section.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 10.0f);
 	Column.HSplitTop(HeadlineHeight, &Label, &Column);
 	Ui()->DoLabel(&Label, TCLocalize("Automation"), HeadlineFontSize, TEXTALIGN_ML);
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoLed, TCLocalize("Autoled single freeze"), &g_Config.m_TcAutoLed, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoHammerNearby, TCLocalize("Auto hammer nearby"), &g_Config.m_TcAutoHammerNearby, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoHammerFrozenTeam, TCLocalize("Auto hammer frozen team"), &g_Config.m_TcAutoHammerFrozenTeam, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFollowTee, TCLocalize("Follow nearest tee"), &g_Config.m_TcFollowTee, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcBalanceBot, TCLocalize("Balance bot"), &g_Config.m_TcBalanceBot, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoDummySave, TCLocalize("Auto dummy save"), &g_Config.m_TcAutoDummySave, &Column, LineSize);
