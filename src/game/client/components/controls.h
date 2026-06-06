@@ -47,6 +47,9 @@ public:
 	int m_AvoidFreezeMessageTick = 0;
 	bool m_AvoidFreezeJumped = false;
 	bool m_AutoDummySaveActive = false;
+	int64_t m_LastEmoteSpamTime = 0;
+	int m_EmoteSpamIndex = 0;
+	bool m_AimCorrectionLogHeaderWritten = false;
 	int AvoidFreezeMessageTick() const { return m_AvoidFreezeMessageTick; }
 
 	CControls();
@@ -70,11 +73,13 @@ public:
 	void FollowTee();
 	void BalanceBot();
 	void AutoDummySave();
+	void EmoteSpammer();
 
 private:
 	bool IsFreezeTile(vec2 Pos);
 	bool IsSingleFreezeTile(vec2 Pos);
 	bool PiFuncCanAimClient(int ClientId) const;
+	void LogAimCorrection(int ClientId, vec2 Pos, vec2 TargetPos, vec2 TargetVel, vec2 OldAim, vec2 NewAim, float TravelTicks, float LateralMiss);
 	static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputCounter(IConsole::IResult *pResult, void *pUserData);
 	static void ConKeyInputSet(IConsole::IResult *pResult, void *pUserData);

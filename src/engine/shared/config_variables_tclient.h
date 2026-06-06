@@ -68,6 +68,10 @@ MACRO_CONFIG_INT(TcAutoHammerNearby, tc_auto_hammer_nearby, 0, 0, 1, CFGFLAG_CLI
 MACRO_CONFIG_INT(TcFollowTee, tc_follow_tee, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Follow nearest allowed tee movement")
 MACRO_CONFIG_INT(TcBalanceBot, tc_balance_bot, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Keep yourself balanced on another tee's head")
 MACRO_CONFIG_INT(TcAutoDummySave, tc_auto_dummy_save, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Use dummy control to hook the main tee when it falls")
+MACRO_CONFIG_INT(TcEmoteSpammer, tc_emote_spammer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Spam emotes 7 and 12 back and forth")
+MACRO_CONFIG_INT(TcEmoteSpammerDelay, tc_emote_spammer_delay, 650, 100, 5000, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Delay between emote spam commands in milliseconds")
+MACRO_CONFIG_INT(TcPiFuncHud, tc_pifunc_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a small HUD with active PiFunc helpers")
+MACRO_CONFIG_INT(TcAimCorrectionLog, tc_aim_correction_log, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Write aim correction samples to pifunc/aim_correction.csv")
 
 MACRO_CONFIG_INT(TcAntiPingImproved, tc_antiping_improved, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Different antiping smoothing algorithm, not compatible with cl_antiping_smooth")
 MACRO_CONFIG_INT(TcAntiPingNegativeBuffer, tc_antiping_negative_buffer, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Helps in Gores. Allows internal certainty value to be negative which causes more conservative prediction")

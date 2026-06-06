@@ -578,6 +578,47 @@ void CHud::RenderTextInfo()
 		TextRender()->Text(m_Width / 2.0f - TextRender()->TextWidth(FontSize, pText, -1, -1.0f) / 2.0f, 28.0f, FontSize, pText, -1.0f);
 		TextRender()->TextColor(TextRender()->DefaultTextColor());
 	}
+	if(g_Config.m_TcPiFuncHud)
+	{
+		const char *apItems[12];
+		int NumItems = 0;
+		if(g_Config.m_TcAvoidFreeze)
+			apItems[NumItems++] = "avoid";
+		if(g_Config.m_TcForgivableHook > 0)
+			apItems[NumItems++] = "hook";
+		if(g_Config.m_TcAutoLed)
+			apItems[NumItems++] = "autoled";
+		if(g_Config.m_TcAutoHammerNearby)
+			apItems[NumItems++] = "hammer";
+		if(g_Config.m_TcFollowTee)
+			apItems[NumItems++] = "follow";
+		if(g_Config.m_TcBalanceBot)
+			apItems[NumItems++] = "balance";
+		if(g_Config.m_TcAutoDummySave)
+			apItems[NumItems++] = "dummy save";
+		if(g_Config.m_TcEmoteSpammer)
+			apItems[NumItems++] = "emote";
+		if(g_Config.m_TcAimCorrectionLog)
+			apItems[NumItems++] = "aim log";
+
+		if(NumItems > 0)
+		{
+			const float FontSize = 7.0f;
+			const float LineHeight = 8.5f;
+			float X = 5.0f;
+			float Y = Showfps || g_Config.m_ClShowpred ? 36.0f : 5.0f;
+			float Width = TextRender()->TextWidth(FontSize, "PiFunc", -1, -1.0f);
+			for(int i = 0; i < NumItems; ++i)
+				Width = maximum(Width, TextRender()->TextWidth(FontSize, apItems[i], -1, -1.0f));
+			Graphics()->DrawRect(X - 3.0f, Y - 2.0f, Width + 8.0f, LineHeight * (NumItems + 1) + 3.0f, ColorRGBA(0.0f, 0.0f, 0.0f, 0.35f), IGraphics::CORNER_ALL, 4.0f);
+			TextRender()->TextColor(ColorRGBA(0.45f, 0.9f, 1.0f, 1.0f));
+			TextRender()->Text(X, Y, FontSize, "PiFunc", -1.0f);
+			TextRender()->TextColor(ColorRGBA(0.9f, 0.95f, 1.0f, 1.0f));
+			for(int i = 0; i < NumItems; ++i)
+				TextRender()->Text(X, Y + LineHeight * (i + 1), FontSize, apItems[i], -1.0f);
+			TextRender()->TextColor(TextRender()->DefaultTextColor());
+		}
+	}
 
 	if(g_Config.m_TcMiniDebug)
 	{

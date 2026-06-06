@@ -2,11 +2,13 @@
 /* If you are missing that file, acquire a complete release at teeworlds.com.                */
 #include "controls.h"
 
+#include <base/io.h>
 #include <base/math.h>
 #include <base/time.h>
 #include <base/vmath.h>
 
 #include <engine/client.h>
+#include <engine/storage.h>
 #include <engine/shared/config.h>
 
 #include <generated/protocol.h>
@@ -39,6 +41,8 @@ void CControls::OnReset()
 
 	m_LastSendTime = 0;
 	m_AvoidFreezeMessageTick = 0;
+	m_LastEmoteSpamTime = 0;
+	m_EmoteSpamIndex = 0;
 }
 
 void CControls::ResetInput(int Dummy)
@@ -224,6 +228,30 @@ bool CControls::PiFuncCanAimClient(int ClientId) const
 	return LocalTeam > 0 && LocalTeam == TargetTeam;
 }
 
+void CControls::LogAimCorrection(int ClientId, vec2 Pos, vec2 TargetPos, vec2 TargetVel, vec2 OldAim, vec2 NewAim, float TravelTicks, float LateralMiss)
+{
+	if(!g_Config.m_TcAimCorrectionLog)
+		return;
+
+	Storage()->CreateFolder("pifunc", IStorage::TYPE_SAVE);
+	IOHANDLE File = Storage()->OpenFile("pifunc/aim_correction.csv", IOFLAG_APPEND, IStorage::TYPE_SAVE);
+	if(!File)
+		return;
+
+	if(!m_AimCorrectionLogHeaderWritten)
+	{
+		static const char s_aHeader[] = "tick,client_id,pos_x,pos_y,target_x,target_y,target_vx,target_vy,old_aim_x,old_aim_y,new_aim_x,new_aim_y,travel_ticks,lateral_miss\n";
+		io_write(File, s_aHeader, sizeof(s_aHeader) - 1);
+		m_AimCorrectionLogHeaderWritten = true;
+	}
+
+	char aLine[512];
+	str_format(aLine, sizeof(aLine), "%d,%d,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f\n",
+		Client()->GameTick(g_Config.m_ClDummy), ClientId, Pos.x, Pos.y, TargetPos.x, TargetPos.y, TargetVel.x, TargetVel.y, OldAim.x, OldAim.y, NewAim.x, NewAim.y, TravelTicks, LateralMiss);
+	io_write(File, aLine, str_length(aLine));
+	io_close(File);
+}
+
 void CControls::AvoidFreeze()
 {
 	m_AvoidFreezeJumped = false;
@@ -321,6 +349,7 @@ void CControls::ForgiveHook()
 
 	float BestLateralMiss = 0.0f;
 	int ClosestClientId = -1;
+	float ClosestTravelTicks = 0.0f;
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 	{
 		if(!PiFuncCanAimClient(ClientId))
@@ -338,7 +367,8 @@ void CControls::ForgiveHook()
 			continue;
 
 		const float HookTicksToTarget = DistanceToTarget / HookFireSpeed;
-		const vec2 PredictedOtherPos = OtherPos + OtherVel * std::clamp(HookTicksToTarget, 0.0f, 6.0f);
+		const float LeadTicks = std::clamp(HookTicksToTarget * 0.55f, 0.0f, 4.0f);
+		const vec2 PredictedOtherPos = OtherPos + OtherVel * LeadTicks;
 
 		const vec2 PredictedToOther = PredictedOtherPos - Pos;
 		const float PredictedDistanceAlongHook = dot(PredictedToOther, Target);
@@ -363,6 +393,7 @@ void CControls::ForgiveHook()
 		{
 			ClosestClientId = ClientId;
 			BestLateralMiss = LateralMiss;
+			ClosestTravelTicks = LeadTicks;
 		}
 	}
 
@@ -373,15 +404,37 @@ void CControls::ForgiveHook()
 	const vec2 OtherPos = vec2(Char.m_X, Char.m_Y);
 	const vec2 OtherVel = vec2(Char.m_VelX / 256.0f, Char.m_VelY / 256.0f);
 	const float HookTicksToTarget = distance(Pos, OtherPos) / HookFireSpeed;
-	const vec2 PredictedOtherPos = OtherPos + OtherVel * std::clamp(HookTicksToTarget, 0.0f, 6.0f);
+	const float LeadTicks = std::clamp(HookTicksToTarget * 0.55f, 0.0f, 4.0f);
+	const vec2 PredictedOtherPos = OtherPos + OtherVel * LeadTicks;
 	const vec2 Aim = PredictedOtherPos - Pos;
 	if(length(Aim) <= 0.0f || length(Aim) > HookLength)
 		return;
 	const float Dot = std::clamp(dot(normalize(Aim), Target), -1.0f, 1.0f);
 	if(std::acos(Dot) > g_Config.m_TcForgivableHook * pi / 180.0f)
 		return;
+	const vec2 OldAim = vec2(m_aInputData[g_Config.m_ClDummy].m_TargetX, m_aInputData[g_Config.m_ClDummy].m_TargetY);
 	m_aInputData[g_Config.m_ClDummy].m_TargetX = round_to_int(Aim.x);
 	m_aInputData[g_Config.m_ClDummy].m_TargetY = round_to_int(Aim.y);
+	LogAimCorrection(ClosestClientId, Pos, OtherPos, OtherVel, OldAim, Aim, ClosestTravelTicks, BestLateralMiss);
+}
+
+void CControls::EmoteSpammer()
+{
+	if(!g_Config.m_TcEmoteSpammer || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+		return;
+
+	const int64_t Now = time_get();
+	const int64_t Delay = time_freq() * maximum(100, g_Config.m_TcEmoteSpammerDelay) / 1000;
+	if(m_LastEmoteSpamTime && Now - m_LastEmoteSpamTime < Delay)
+		return;
+
+	m_LastEmoteSpamTime = Now;
+	const int Emote = m_EmoteSpamIndex ? 12 : 7;
+	m_EmoteSpamIndex = !m_EmoteSpamIndex;
+
+	char aCmd[32];
+	str_format(aCmd, sizeof(aCmd), "emote %d", Emote);
+	Console()->ExecuteLine(aCmd, IConsole::CLIENT_ID_UNSPECIFIED);
 }
 
 void CControls::AutoLed()
@@ -732,6 +785,7 @@ int CControls::SnapInput(int *pData)
 			m_aInputData[g_Config.m_ClDummy].m_TargetX = 1;
 
 		ForgiveHook();
+		EmoteSpammer();
 		AutoLed();
 		AutoHammerNearby();
 		AutoDummySave();

@@ -378,25 +378,59 @@ void CMenus::RenderSettingsTClient(CUIRect MainView)
 
 void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 {
-	CUIRect Column, Button, Label;
+	CUIRect LeftView, RightView, Column, Button, Label, Section;
 	MainView.VSplitLeft(5.0f, nullptr, &MainView);
 	MainView.VSplitRight(5.0f, &MainView, nullptr);
-	MainView.VSplitMid(&Column, nullptr, MarginBetweenViews);
+	MainView.VSplitMid(&LeftView, &RightView, MarginBetweenViews);
 
-	Column.HSplitTop(Margin, nullptr, &Column);
+	LeftView.HSplitTop(Margin, nullptr, &LeftView);
+	RightView.HSplitTop(Margin, nullptr, &RightView);
+
+	Column = LeftView;
+	Section = Column;
+	Section.h = 125.0f;
+	Section.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 10.0f);
 	Column.HSplitTop(HeadlineHeight, &Label, &Column);
-	Ui()->DoLabel(&Label, TCLocalize("PiFunc"), HeadlineFontSize, TEXTALIGN_ML);
+	Ui()->DoLabel(&Label, TCLocalize("Safety / Aim"), HeadlineFontSize, TEXTALIGN_ML);
 	Column.HSplitTop(MarginSmall, nullptr, &Column);
-
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAvoidFreeze, TCLocalize("Avoid freeze when AFK"), &g_Config.m_TcAvoidFreeze, &Column, LineSize);
 	Column.HSplitTop(LineSize, &Button, &Column);
 	Ui()->DoScrollbarOption(&g_Config.m_TcForgivableHook, &g_Config.m_TcForgivableHook, &Button, TCLocalize("Forgivable hook"), 0, 45, &CUi::ms_LinearScrollbarScale, 0, " deg");
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncNotAimTeam, TCLocalize("Not aim !team"), &g_Config.m_TcPiFuncNotAimTeam, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAimCorrectionLog, TCLocalize("Log aim correction data"), &g_Config.m_TcAimCorrectionLog, &Column, LineSize);
+
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+	Section = Column;
+	Section.h = 60.0f;
+	Section.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 10.0f);
+	Column.HSplitTop(HeadlineHeight, &Label, &Column);
+	Ui()->DoLabel(&Label, TCLocalize("Visuals"), HeadlineFontSize, TEXTALIGN_ML);
+	Column.HSplitTop(MarginSmall, nullptr, &Column);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncHud, TCLocalize("Small PiFunc HUD"), &g_Config.m_TcPiFuncHud, &Column, LineSize);
+
+	Column = RightView;
+	Section = Column;
+	Section.h = 135.0f;
+	Section.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 10.0f);
+	Column.HSplitTop(HeadlineHeight, &Label, &Column);
+	Ui()->DoLabel(&Label, TCLocalize("Automation"), HeadlineFontSize, TEXTALIGN_ML);
+	Column.HSplitTop(MarginSmall, nullptr, &Column);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoLed, TCLocalize("Autoled single freeze"), &g_Config.m_TcAutoLed, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoHammerNearby, TCLocalize("Auto hammer nearby"), &g_Config.m_TcAutoHammerNearby, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcFollowTee, TCLocalize("Follow nearest tee"), &g_Config.m_TcFollowTee, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcBalanceBot, TCLocalize("Balance bot"), &g_Config.m_TcBalanceBot, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAutoDummySave, TCLocalize("Auto dummy save"), &g_Config.m_TcAutoDummySave, &Column, LineSize);
+
+	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
+	Section = Column;
+	Section.h = 90.0f;
+	Section.Draw(ColorRGBA(0.0f, 0.0f, 0.0f, 0.18f), IGraphics::CORNER_ALL, 10.0f);
+	Column.HSplitTop(HeadlineHeight, &Label, &Column);
+	Ui()->DoLabel(&Label, TCLocalize("Fun"), HeadlineFontSize, TEXTALIGN_ML);
+	Column.HSplitTop(MarginSmall, nullptr, &Column);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcEmoteSpammer, TCLocalize("Emote spammer 7/12"), &g_Config.m_TcEmoteSpammer, &Column, LineSize);
+	Column.HSplitTop(LineSize, &Button, &Column);
+	Ui()->DoScrollbarOption(&g_Config.m_TcEmoteSpammerDelay, &g_Config.m_TcEmoteSpammerDelay, &Button, TCLocalize("Spam delay"), 100, 5000, &CUi::ms_LinearScrollbarScale, 0, " ms");
 }
 
 void CMenus::RenderSettingsTClientSettings(CUIRect MainView)
