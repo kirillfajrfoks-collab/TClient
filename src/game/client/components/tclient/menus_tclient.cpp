@@ -400,7 +400,7 @@ void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcAvoidFreeze, TCLocalize("Avoid freeze when AFK"), &g_Config.m_TcAvoidFreeze, &Column, LineSize);
 	Column.HSplitTop(LineSize, &Button, &Column);
 	Ui()->DoScrollbarOption(&g_Config.m_TcAvoidFreezeHookTicks, &g_Config.m_TcAvoidFreezeHookTicks, &Button, TCLocalize("Avoid hook time"), 2, 50, &CUi::ms_LinearScrollbarScale, 0, " ticks");
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncNotAimTeam, TCLocalize("Only TClient !team targets"), &g_Config.m_TcPiFuncNotAimTeam, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncNotAimTeam, TCLocalize("Do not aim TClient !team"), &g_Config.m_TcPiFuncNotAimTeam, &Column, LineSize);
 
 	Column.HSplitTop(MarginBetweenViews, nullptr, &Column);
 	Section = Column;
@@ -426,7 +426,7 @@ void CMenus::RenderSettingsTClientPiFunc(CUIRect MainView)
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncHud, TCLocalize("Small PiFunc HUD"), &g_Config.m_TcPiFuncHud, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncTargetDebug, TCLocalize("PiFunc target debug"), &g_Config.m_TcPiFuncTargetDebug, &Column, LineSize);
 	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncRangeVisual, TCLocalize("Aim range visual"), &g_Config.m_TcPiFuncRangeVisual, &Column, LineSize);
-	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncTargetVisual, TCLocalize("!team target markers"), &g_Config.m_TcPiFuncTargetVisual, &Column, LineSize);
+	DoButton_CheckBoxAutoVMarginAndSet(&g_Config.m_TcPiFuncTargetVisual, TCLocalize("Safe target markers"), &g_Config.m_TcPiFuncTargetVisual, &Column, LineSize);
 
 	Column = RightView;
 	Section = Column;

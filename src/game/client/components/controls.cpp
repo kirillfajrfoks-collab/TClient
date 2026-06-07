@@ -234,7 +234,7 @@ bool CControls::PiFuncCanAimClient(int ClientId) const
 		return false;
 
 	const auto &WarGroups = GameClient()->m_WarList.GetWarData(ClientId).m_WarGroupMatches;
-	return WarGroups.size() > 2 && WarGroups[2];
+	return WarGroups.size() <= 2 || !WarGroups[2];
 }
 
 bool CControls::IsClientFrozen(int ClientId) const

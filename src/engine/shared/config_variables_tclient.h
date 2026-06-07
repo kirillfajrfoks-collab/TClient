@@ -63,7 +63,7 @@ MACRO_CONFIG_INT(TcFastInputOthers, tc_fast_input_others, 0, 0, 1, CFGFLAG_CLIEN
 MACRO_CONFIG_INT(TcAvoidFreeze, tc_avoid_freeze, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically move away from nearby freeze tiles")
 MACRO_CONFIG_INT(TcAvoidFreezeHookTicks, tc_avoid_freeze_hook_ticks, 12, 2, 50, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Maximum ticks Avoid freeze may hold its automatic hook")
 MACRO_CONFIG_INT(TcForgivableHook, tc_forgivable_hook, 0, 0, 45, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Extra hook hit forgiveness in degrees")
-MACRO_CONFIG_INT(TcPiFuncNotAimTeam, tc_pifunc_not_aim_team, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Only aim PiFunc helpers at players marked by TClient !team")
+MACRO_CONFIG_INT(TcPiFuncNotAimTeam, tc_pifunc_not_aim_team, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Do not aim PiFunc helpers at players marked by TClient !team")
 MACRO_CONFIG_INT(TcAutoLed, tc_autoled, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically hammer teammates entering single freeze tiles")
 MACRO_CONFIG_INT(TcAutoHammerNearby, tc_auto_hammer_nearby, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically hammer nearby allowed players")
 MACRO_CONFIG_INT(TcAutoHammerFrozenTeam, tc_auto_hammer_frozen_team, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Automatically hammer frozen teammates when they are close")
@@ -77,7 +77,7 @@ MACRO_CONFIG_INT(TcEmoteSpammerDelay, tc_emote_spammer_delay, 650, 100, 5000, CF
 MACRO_CONFIG_INT(TcPiFuncHud, tc_pifunc_hud, 1, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show a small HUD with active PiFunc helpers")
 MACRO_CONFIG_INT(TcPiFuncTargetDebug, tc_pifunc_target_debug, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show PiFunc allowed/frozen target counts on HUD")
 MACRO_CONFIG_INT(TcPiFuncRangeVisual, tc_pifunc_range_visual, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Show PiFunc hook/weapon helper ranges around your tee")
-MACRO_CONFIG_INT(TcPiFuncTargetVisual, tc_pifunc_target_visual, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mark TClient !team targets for PiFunc helpers")
+MACRO_CONFIG_INT(TcPiFuncTargetVisual, tc_pifunc_target_visual, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Mark players PiFunc helpers are allowed to target")
 MACRO_CONFIG_INT(TcAimCorrectionLog, tc_aim_correction_log, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Write aim correction samples to pifunc/aim_correction.csv")
 
 MACRO_CONFIG_INT(TcAntiPingImproved, tc_antiping_improved, 0, 0, 1, CFGFLAG_CLIENT | CFGFLAG_SAVE, "Different antiping smoothing algorithm, not compatible with cl_antiping_smooth")
