@@ -580,14 +580,18 @@ void CHud::RenderTextInfo()
 	}
 	if(g_Config.m_TcPiFuncHud)
 	{
-		const char *apItems[14];
+		const char *apItems[18];
 		int NumItems = 0;
 		if(g_Config.m_TcAvoidFreeze)
 			apItems[NumItems++] = "avoid";
 		if(g_Config.m_TcForgivableHook > 0)
 			apItems[NumItems++] = "hook";
-		if(g_Config.m_TcGunAimAssist)
+	if(g_Config.m_TcGunAimAssist)
 			apItems[NumItems++] = "sg/laser aim";
+		if(g_Config.m_TcPiFuncRangeVisual)
+			apItems[NumItems++] = "ranges";
+		if(g_Config.m_TcPiFuncTargetVisual)
+			apItems[NumItems++] = "target marks";
 		if(g_Config.m_TcAutoLed)
 			apItems[NumItems++] = "autoled";
 		if(g_Config.m_TcAutoHammerNearby)
@@ -610,13 +614,12 @@ void CHud::RenderTextInfo()
 			int Allowed = 0;
 			int Frozen = 0;
 			const int LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy] >= 0 ? GameClient()->m_aLocalIds[g_Config.m_ClDummy] : GameClient()->m_Snap.m_LocalClientId;
-			const int LocalTeam = LocalId >= 0 ? GameClient()->m_Teams.Team(LocalId) : -1;
 			for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
 			{
 				if(ClientId == LocalId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
 					continue;
-				const int TargetTeam = GameClient()->m_Teams.Team(ClientId);
-				const bool AllowedTarget = !g_Config.m_TcPiFuncNotAimTeam || (LocalId >= 0 && LocalTeam > 0 && TargetTeam == LocalTeam && !GameClient()->m_aClients[ClientId].m_Solo && !GameClient()->m_aClients[LocalId].m_Solo);
+				const auto &WarGroups = GameClient()->m_WarList.GetWarData(ClientId).m_WarGroupMatches;
+				const bool AllowedTarget = !g_Config.m_TcPiFuncNotAimTeam || (WarGroups.size() > 2 && WarGroups[2]);
 				if(!AllowedTarget)
 					continue;
 				Allowed++;
@@ -893,6 +896,49 @@ void CHud::RenderCursor()
 		// Render local cursor
 		CurWeapon = maximum(0, GameClient()->m_aClients[GameClient()->m_Snap.m_LocalClientId].m_Predicted.m_ActiveWeapon);
 		TargetPos = GameClient()->m_Controls.m_aTargetPos[g_Config.m_ClDummy];
+
+		if((g_Config.m_TcPiFuncRangeVisual || g_Config.m_TcPiFuncTargetVisual) && !GameClient()->m_Snap.m_SpecInfo.m_Active)
+		{
+			const int LocalId = GameClient()->m_aLocalIds[g_Config.m_ClDummy] >= 0 ? GameClient()->m_aLocalIds[g_Config.m_ClDummy] : GameClient()->m_Snap.m_LocalClientId;
+			const vec2 LocalPos = GameClient()->m_PredictedChar.m_Pos;
+			if(g_Config.m_TcPiFuncRangeVisual)
+			{
+				Graphics()->TextureClear();
+				if(g_Config.m_TcForgivableHook > 0)
+				{
+					Graphics()->SetColor(0.45f, 0.9f, 1.0f, 0.18f);
+					Graphics()->DrawCircle(LocalPos.x, LocalPos.y, (float)GameClient()->m_aTuning[g_Config.m_ClDummy].m_HookLength, 96);
+				}
+				if(g_Config.m_TcGunAimAssist)
+				{
+					Graphics()->SetColor(1.0f, 0.75f, 0.25f, 0.15f);
+					Graphics()->DrawCircle(LocalPos.x, LocalPos.y, 850.0f, 96);
+				}
+				if(g_Config.m_TcAutoHammerNearby || g_Config.m_TcAutoHammerFrozenTeam || g_Config.m_TcAutoLed)
+				{
+					Graphics()->SetColor(0.25f, 1.0f, 0.35f, 0.20f);
+					Graphics()->DrawCircle(LocalPos.x, LocalPos.y, 140.0f, 48);
+				}
+			}
+
+			if(g_Config.m_TcPiFuncTargetVisual)
+			{
+				Graphics()->TextureClear();
+				for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
+				{
+					if(ClientId == LocalId || !GameClient()->m_Snap.m_aCharacters[ClientId].m_Active)
+						continue;
+					const auto &WarGroups = GameClient()->m_WarList.GetWarData(ClientId).m_WarGroupMatches;
+					if(g_Config.m_TcPiFuncNotAimTeam && (WarGroups.size() <= 2 || !WarGroups[2]))
+						continue;
+					const bool Frozen = GameClient()->m_aClients[ClientId].m_FreezeEnd != 0 || GameClient()->m_aClients[ClientId].m_DeepFrozen || GameClient()->m_aClients[ClientId].m_LiveFrozen;
+					Graphics()->SetColor(Frozen ? ColorRGBA(0.35f, 0.75f, 1.0f, 0.45f) : ColorRGBA(0.1f, 1.0f, 0.25f, 0.35f));
+					const vec2 Pos = GameClient()->m_aClients[ClientId].m_RenderPos;
+					Graphics()->DrawCircle(Pos.x, Pos.y, Frozen ? 34.0f : 28.0f, 32);
+				}
+			}
+			Graphics()->SetColor(1.0f, 1.0f, 1.0f, 1.0f);
+		}
 	}
 	else
 	{

@@ -46,6 +46,9 @@ public:
 	bool m_FastInputFireAction = false;
 	int m_AvoidFreezeMessageTick = 0;
 	bool m_AvoidFreezeJumped = false;
+	bool m_AvoidFreezeHooked = false;
+	int m_AvoidFreezeHookUntilTick = 0;
+	int m_AvoidFreezeHookCooldownTick = 0;
 	bool m_AutoDummySaveActive = false;
 	int64_t m_LastEmoteSpamTime = 0;
 	int m_EmoteSpamIndex = 0;
@@ -54,6 +57,8 @@ public:
 	int m_AimCorrectionPendingTick = -1;
 	int m_AimCorrectionPendingClientId = -1;
 	float m_AimCorrectionPendingLateralMiss = 0.0f;
+	int m_LastAimCorrectionLogTick = -1;
+	int m_LastAimCorrectionLogClientId = -1;
 	int AvoidFreezeMessageTick() const { return m_AvoidFreezeMessageTick; }
 
 	CControls();

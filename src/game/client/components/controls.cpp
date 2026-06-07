@@ -43,11 +43,16 @@ void CControls::OnReset()
 
 	m_LastSendTime = 0;
 	m_AvoidFreezeMessageTick = 0;
+	m_AvoidFreezeHooked = false;
+	m_AvoidFreezeHookUntilTick = 0;
+	m_AvoidFreezeHookCooldownTick = 0;
 	m_LastEmoteSpamTime = 0;
 	m_EmoteSpamIndex = 0;
 	m_AimCorrectionPendingTick = -1;
 	m_AimCorrectionPendingClientId = -1;
 	m_AimCorrectionPendingLateralMiss = 0.0f;
+	m_LastAimCorrectionLogTick = -1;
+	m_LastAimCorrectionLogClientId = -1;
 }
 
 void CControls::ResetInput(int Dummy)
@@ -228,9 +233,8 @@ bool CControls::PiFuncCanAimClient(int ClientId) const
 	if(LocalId < 0)
 		return false;
 
-	const int LocalTeam = GameClient()->m_Teams.Team(LocalId);
-	const int TargetTeam = GameClient()->m_Teams.Team(ClientId);
-	return LocalTeam > 0 && TargetTeam == LocalTeam && !GameClient()->m_aClients[ClientId].m_Solo && !GameClient()->m_aClients[LocalId].m_Solo;
+	const auto &WarGroups = GameClient()->m_WarList.GetWarData(ClientId).m_WarGroupMatches;
+	return WarGroups.size() > 2 && WarGroups[2];
 }
 
 bool CControls::IsClientFrozen(int ClientId) const
@@ -257,18 +261,31 @@ void CControls::LogAimCorrection(int ClientId, vec2 Pos, vec2 TargetPos, vec2 Ta
 {
 	if(!g_Config.m_TcAimCorrectionLog)
 		return;
+	const int Tick = Client()->GameTick(g_Config.m_ClDummy);
+	if(ClientId == m_LastAimCorrectionLogClientId && Tick - m_LastAimCorrectionLogTick < 6)
+		return;
+	m_LastAimCorrectionLogTick = Tick;
+	m_LastAimCorrectionLogClientId = ClientId;
 
 	Storage()->CreateFolder("pifunc", IStorage::TYPE_SAVE);
+	bool WriteHeader = true;
+	IOHANDLE ExistingFile = Storage()->OpenFile("pifunc/aim_correction.csv", IOFLAG_READ, IStorage::TYPE_SAVE);
+	if(ExistingFile)
+	{
+		WriteHeader = io_length(ExistingFile) == 0;
+		io_close(ExistingFile);
+	}
+
 	IOHANDLE File = Storage()->OpenFile("pifunc/aim_correction.csv", IOFLAG_APPEND, IStorage::TYPE_SAVE);
 	if(!File)
 		return;
 
-	if(!m_AimCorrectionLogHeaderWritten)
+	if(WriteHeader && !m_AimCorrectionLogHeaderWritten)
 	{
 		static const char s_aHeader[] = "tick,client_id,pos_x,pos_y,target_x,target_y,target_vx,target_vy,old_aim_x,old_aim_y,new_aim_x,new_aim_y,travel_ticks,lateral_miss\n";
 		io_write(File, s_aHeader, sizeof(s_aHeader) - 1);
-		m_AimCorrectionLogHeaderWritten = true;
 	}
+	m_AimCorrectionLogHeaderWritten = true;
 
 	char aLine[512];
 	str_format(aLine, sizeof(aLine), "%d,%d,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f,%.2f,%.2f,%.2f,%.2f,%.3f,%.3f\n",
@@ -276,7 +293,7 @@ void CControls::LogAimCorrection(int ClientId, vec2 Pos, vec2 TargetPos, vec2 Ta
 	io_write(File, aLine, str_length(aLine));
 	io_close(File);
 
-	m_AimCorrectionPendingTick = Client()->GameTick(g_Config.m_ClDummy);
+	m_AimCorrectionPendingTick = Tick;
 	m_AimCorrectionPendingClientId = ClientId;
 	m_AimCorrectionPendingLateralMiss = LateralMiss;
 }
@@ -301,6 +318,14 @@ void CControls::LogAimCorrectionResult()
 		return;
 
 	Storage()->CreateFolder("pifunc", IStorage::TYPE_SAVE);
+	bool WriteHeader = true;
+	IOHANDLE ExistingFile = Storage()->OpenFile("pifunc/aim_correction_result.csv", IOFLAG_READ, IStorage::TYPE_SAVE);
+	if(ExistingFile)
+	{
+		WriteHeader = io_length(ExistingFile) == 0;
+		io_close(ExistingFile);
+	}
+
 	IOHANDLE File = Storage()->OpenFile("pifunc/aim_correction_result.csv", IOFLAG_APPEND, IStorage::TYPE_SAVE);
 	if(!File)
 	{
@@ -308,12 +333,12 @@ void CControls::LogAimCorrectionResult()
 		return;
 	}
 
-	if(!m_AimCorrectionResultLogHeaderWritten)
+	if(WriteHeader && !m_AimCorrectionResultLogHeaderWritten)
 	{
 		static const char s_aHeader[] = "correction_tick,result_tick,target_client_id,hooked_client_id,success,age_ticks,lateral_miss\n";
 		io_write(File, s_aHeader, sizeof(s_aHeader) - 1);
-		m_AimCorrectionResultLogHeaderWritten = true;
 	}
+	m_AimCorrectionResultLogHeaderWritten = true;
 
 	char aLine[256];
 	str_format(aLine, sizeof(aLine), "%d,%d,%d,%d,%d,%d,%.3f\n",
@@ -327,12 +352,31 @@ void CControls::LogAimCorrectionResult()
 void CControls::AvoidFreeze()
 {
 	m_AvoidFreezeJumped = false;
+	const int Tick = Client()->GameTick(g_Config.m_ClDummy);
+	const auto ReleaseAvoidHook = [&]() {
+		if(m_AvoidFreezeHooked)
+		{
+			m_aInputData[g_Config.m_ClDummy].m_Hook = 0;
+			m_AvoidFreezeHooked = false;
+			m_AvoidFreezeHookCooldownTick = Tick + 6;
+		}
+	};
+
 	if(!g_Config.m_TcAvoidFreeze || GameClient()->m_Snap.m_SpecInfo.m_Active || !GameClient()->m_Snap.m_pLocalCharacter)
+	{
+		ReleaseAvoidHook();
 		return;
+	}
 
 	const CCharacterCore &Char = GameClient()->m_PredictedChar;
 	if(Char.m_IsInFreeze)
+	{
+		ReleaseAvoidHook();
 		return;
+	}
+
+	if(m_AvoidFreezeHooked && Tick > m_AvoidFreezeHookUntilTick)
+		ReleaseAvoidHook();
 
 	const vec2 Pos = Char.m_Pos;
 	const vec2 Vel = Char.m_Vel;
@@ -365,7 +409,10 @@ void CControls::AvoidFreeze()
 
 	const int CurrentScore = DangerScore(0);
 	if(CurrentScore == 0 && !HookedByPlayer)
+	{
+		ReleaseAvoidHook();
 		return;
+	}
 
 	int AvoidDir = 0;
 	if(!ManualDirection)
@@ -386,7 +433,10 @@ void CControls::AvoidFreeze()
 	}
 
 	if(AvoidDir == 0 && (!HookedByPlayer || (!FreezeAbove && !FreezeBelow)) && CurrentScore == 0)
+	{
+		ReleaseAvoidHook();
 		return;
+	}
 
 	if(AvoidDir != 0)
 		m_aInputData[g_Config.m_ClDummy].m_Direction = AvoidDir;
@@ -395,13 +445,20 @@ void CControls::AvoidFreeze()
 		m_aInputData[g_Config.m_ClDummy].m_Jump = 1;
 		m_AvoidFreezeJumped = true;
 	}
-	if(HookedByPlayer && FreezeAbove)
+	if(HookedByPlayer && FreezeAbove && Tick >= m_AvoidFreezeHookCooldownTick)
 	{
 		m_aInputData[g_Config.m_ClDummy].m_Hook = 1;
 		m_aInputData[g_Config.m_ClDummy].m_TargetX = 0;
 		m_aInputData[g_Config.m_ClDummy].m_TargetY = 100;
+		if(!m_AvoidFreezeHooked)
+		{
+			m_AvoidFreezeHooked = true;
+			m_AvoidFreezeHookUntilTick = Tick + g_Config.m_TcAvoidFreezeHookTicks;
+		}
 	}
-	m_AvoidFreezeMessageTick = Client()->GameTick(g_Config.m_ClDummy) + 10;
+	else if(m_AvoidFreezeHooked && !FreezeAbove)
+		ReleaseAvoidHook();
+	m_AvoidFreezeMessageTick = Tick + 10;
 }
 
 void CControls::ForgiveHook()
@@ -420,6 +477,7 @@ void CControls::ForgiveHook()
 	Target = normalize(Target);
 
 	float BestLateralMiss = 0.0f;
+	float SecondBestLateralMiss = 0.0f;
 	int ClosestClientId = -1;
 	float ClosestTravelTicks = 0.0f;
 	for(int ClientId = 0; ClientId < MAX_CLIENTS; ++ClientId)
@@ -461,15 +519,23 @@ void CControls::ForgiveHook()
 		if(length(Aim) > HookLength || Collision()->IntersectLineTeleHook(HookStart, PredictedOtherPos, &CollisionPos, nullptr, &TeleNr))
 			continue;
 
-		if(LateralMiss < VanillaRadius + ForgivableRadius && (ClosestClientId == -1 || LateralMiss < BestLateralMiss))
+		if(LateralMiss < VanillaRadius + ForgivableRadius)
 		{
-			ClosestClientId = ClientId;
-			BestLateralMiss = LateralMiss;
-			ClosestTravelTicks = LeadTicks;
+			if(ClosestClientId == -1 || LateralMiss < BestLateralMiss)
+			{
+				SecondBestLateralMiss = BestLateralMiss;
+				ClosestClientId = ClientId;
+				BestLateralMiss = LateralMiss;
+				ClosestTravelTicks = LeadTicks;
+			}
+			else if(SecondBestLateralMiss == 0.0f || LateralMiss < SecondBestLateralMiss)
+				SecondBestLateralMiss = LateralMiss;
 		}
 	}
 
 	if(ClosestClientId == -1)
+		return;
+	if(SecondBestLateralMiss > 0.0f && SecondBestLateralMiss - BestLateralMiss < 18.0f)
 		return;
 
 	const CNetObj_Character &Char = GameClient()->m_Snap.m_aCharacters[ClosestClientId].m_Cur;
@@ -1020,6 +1086,12 @@ int CControls::SnapInput(int *pData)
 	CNetObj_PlayerInput SendInput = m_aInputData[g_Config.m_ClDummy];
 	if(m_AvoidFreezeJumped)
 		m_aInputData[g_Config.m_ClDummy].m_Jump = 0;
+	if(m_AvoidFreezeHooked && Client()->GameTick(g_Config.m_ClDummy) >= m_AvoidFreezeHookUntilTick)
+	{
+		m_aInputData[g_Config.m_ClDummy].m_Hook = 0;
+		m_AvoidFreezeHooked = false;
+		m_AvoidFreezeHookCooldownTick = Client()->GameTick(g_Config.m_ClDummy) + 6;
+	}
 
 	// copy and return size
 	m_aLastData[g_Config.m_ClDummy] = SendInput;
